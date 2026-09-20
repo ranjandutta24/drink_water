@@ -316,7 +316,9 @@ class NotificationService {
       final medicine = medicines[medIndex];
       if (!medicine.enabled) continue;
 
-      final times = medicine.sortedTimes;
+      // effectiveTimes, not sortedTimes: an interval medicine derives its times
+      // from the rule, so this stays right even if the stored list is stale.
+      final times = medicine.effectiveTimes;
       for (final weekday in medicine.weekdays) {
         for (var timeIndex = 0; timeIndex < times.length; timeIndex++) {
           final id = medicineNotificationId(medIndex, weekday, timeIndex);

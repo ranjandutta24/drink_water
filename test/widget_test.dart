@@ -1,4 +1,5 @@
 import 'package:drink_water/models/medicine.dart';
+import 'package:drink_water/models/time_of_day_x.dart';
 import 'package:drink_water/models/volume_unit.dart';
 import 'package:drink_water/models/water_log.dart';
 import 'package:drink_water/models/water_settings.dart';
@@ -168,6 +169,136 @@ void main() {
     });
   });
 
+  group('medicine interval schedule', () {
+    test('steps from the start time up to and including the end', () {
+      final times = Medicine.buildIntervalTimes(
+        intervalHours: 4,
+        start: const TimeOfDay(hour: 8, minute: 0),
+        end: const TimeOfDay(hour: 20, minute: 0),
+      );
+
+      expect(times.map((t) => t.hhmm), ['08:00', '12:00', '16:00', '20:00']);
+    });
+
+    test('a window that crosses midnight wraps the clock', () {
+      final times = Medicine.buildIntervalTimes(
+        intervalHours: 3,
+        start: const TimeOfDay(hour: 22, minute: 0),
+        end: const TimeOfDay(hour: 4, minute: 0),
+      );
+
+      expect(times.map((t) => t.hhmm), ['22:00', '01:00', '04:00']);
+    });
+
+    test('equal start and end covers the whole day', () {
+      final times = Medicine.buildIntervalTimes(
+        intervalHours: 12,
+        start: const TimeOfDay(hour: 9, minute: 0),
+        end: const TimeOfDay(hour: 9, minute: 0),
+      );
+
+      // The wrap back onto 09:00 is dropped rather than fired twice.
+      expect(times.map((t) => t.hhmm), ['09:00', '21:00']);
+    });
+
+    test('never generates more than the id scheme allows', () {
+      final times = Medicine.buildIntervalTimes(
+        intervalHours: 1,
+        start: const TimeOfDay(hour: 0, minute: 0),
+        end: const TimeOfDay(hour: 0, minute: 0),
+      );
+
+      expect(times.length, Medicine.maxIntervalTimes);
+    });
+
+    test('a zero or negative interval yields nothing rather than looping', () {
+      expect(
+        Medicine.buildIntervalTimes(
+          intervalHours: 0,
+          start: const TimeOfDay(hour: 8, minute: 0),
+          end: const TimeOfDay(hour: 20, minute: 0),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('json keeps the rule and regenerates the times on the way back', () {
+      final medicine = Medicine(
+        id: 'm-int',
+        name: 'Paracetamol',
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        times: const [TimeOfDay(hour: 9, minute: 0)],
+        schedule: MedicineSchedule.interval,
+        intervalHours: 6,
+        intervalStart: const TimeOfDay(hour: 6, minute: 0),
+        intervalEnd: const TimeOfDay(hour: 22, minute: 0),
+      );
+
+      final restored = Medicine.tryFromJson(medicine.toJson())!;
+
+      expect(restored.schedule, MedicineSchedule.interval);
+      expect(restored.intervalHours, 6);
+      expect(restored.intervalStart.hhmm, '06:00');
+      expect(restored.intervalEnd.hhmm, '22:00');
+      // 06:00, 12:00, 18:00 — 24:00 falls outside the window.
+      expect(restored.times.map((t) => t.hhmm), ['06:00', '12:00', '18:00']);
+      expect(restored.dosesPerWeek, 21);
+    });
+
+    test('a medicine without the new keys stays on explicit times', () {
+      final restored = Medicine.tryFromJson({
+        'id': 'legacy',
+        'name': 'Old entry',
+        'weekdays': [1, 2],
+        'times': ['07:15', '19:45'],
+      })!;
+
+      expect(restored.schedule, MedicineSchedule.times);
+      expect(restored.effectiveTimes.map((t) => t.hhmm), ['07:15', '19:45']);
+    });
+
+    test('an out-of-range interval falls back to the default', () {
+      final restored = Medicine.tryFromJson({
+        'id': 'bad',
+        'name': 'Nonsense',
+        'weekdays': [1],
+        'times': ['08:00'],
+        'schedule': 'interval',
+        'intervalHours': 0,
+        'intervalStart': '08:00',
+        'intervalEnd': '16:00',
+      })!;
+
+      expect(restored.intervalHours, Medicine.kDefaultIntervalHours);
+      expect(restored.effectiveTimes.map((t) => t.hhmm), [
+        '08:00',
+        '12:00',
+        '16:00',
+      ]);
+    });
+
+    test('scheduleLabel describes the rule, not every time', () {
+      final medicine = Medicine(
+        id: 'm-int',
+        name: 'Paracetamol',
+        weekdays: const {1},
+        times: const [TimeOfDay(hour: 8, minute: 0)],
+        schedule: MedicineSchedule.interval,
+        intervalHours: 2,
+        intervalStart: const TimeOfDay(hour: 8, minute: 0),
+        intervalEnd: const TimeOfDay(hour: 22, minute: 0),
+      );
+
+      expect(medicine.scheduleLabel(use24h: true), 'Every 2 h · 08:00–22:00');
+      expect(
+        medicine
+            .copyWith(schedule: MedicineSchedule.times)
+            .scheduleLabel(use24h: true),
+        '08:00',
+      );
+    });
+  });
+
   group('backup', () {
     test('round-trips settings, medicines and history without loss', () {
       const settings = WaterSettings(
@@ -181,6 +312,7 @@ void main() {
         amountPerReminderMl: 330,
         use24hClock: true,
         vibrate: false,
+        soundOnLog: false,
       );
 
       final medicines = [
@@ -230,6 +362,7 @@ void main() {
       expect(restored.settings.bottleSizeMl, 900);
       expect(restored.settings.amountPerReminderMl, 330);
       expect(restored.settings.vibrate, isFalse);
+      expect(restored.settings.soundOnLog, isFalse);
 
       expect(restored.medicines.length, 1);
       final medicine = restored.medicines.single;
@@ -242,6 +375,14 @@ void main() {
       expect(restored.waterLog.single.amountMl, 250);
       expect(restored.waterLog.single.fromNotification, isTrue);
       expect(restored.medicineLog.single.medicineId, 'm1');
+    });
+
+    test('a backup written before the sound flag existed keeps it on', () {
+      final settings = WaterSettings.fromJson(
+        const WaterSettings().toJson()..remove('soundOnLog'),
+      );
+
+      expect(settings.soundOnLog, isTrue);
     });
 
     test('rejects a file that is not JSON', () {

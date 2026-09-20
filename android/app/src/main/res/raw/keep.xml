@@ -6,7 +6,11 @@
   Resources.getIdentifier(). The shrinker cannot see that, so the drawable looks
   unused and can be stripped; the alarm then fires and fails on a missing icon.
   Listing it here makes it explicitly reachable.
+
+  raw/water_swallow is kept for the same reason: MainActivity loads it through
+  R.raw.water_swallow, which the shrinker can see, but keeping it listed means a
+  future move to a runtime-resolved name cannot silently break the sound.
 -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_notification,@mipmap/ic_launcher,@mipmap/ic_launcher_round,@mipmap/ic_launcher_foreground,@mipmap/ic_launcher_monochrome"
+    tools:keep="@drawable/ic_notification,@raw/water_swallow,@mipmap/ic_launcher,@mipmap/ic_launcher_round,@mipmap/ic_launcher_foreground,@mipmap/ic_launcher_monochrome"
     tools:shrinkMode="safe" />

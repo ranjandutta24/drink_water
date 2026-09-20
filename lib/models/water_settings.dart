@@ -18,6 +18,7 @@ class WaterSettings {
     this.amountPerReminderMl,
     this.use24hClock = false,
     this.vibrate = true,
+    this.soundOnLog = true,
   });
 
   final bool remindersEnabled;
@@ -44,6 +45,10 @@ class WaterSettings {
 
   final bool use24hClock;
   final bool vibrate;
+
+  /// Plays a short swallow sound when a drink is logged inside the app. Follows
+  /// media volume, so it is already silent on a muted phone.
+  final bool soundOnLog;
 
   /// Size in millilitres of one unit of [displayUnit].
   int get unitSizeMl => switch (displayUnit) {
@@ -106,6 +111,7 @@ class WaterSettings {
     bool clearAmountPerReminder = false,
     bool? use24hClock,
     bool? vibrate,
+    bool? soundOnLog,
   }) {
     return WaterSettings(
       remindersEnabled: remindersEnabled ?? this.remindersEnabled,
@@ -121,6 +127,7 @@ class WaterSettings {
           : (amountPerReminderMl ?? this.amountPerReminderMl),
       use24hClock: use24hClock ?? this.use24hClock,
       vibrate: vibrate ?? this.vibrate,
+      soundOnLog: soundOnLog ?? this.soundOnLog,
     );
   }
 
@@ -136,6 +143,7 @@ class WaterSettings {
     'amountPerReminderMl': amountPerReminderMl,
     'use24hClock': use24hClock,
     'vibrate': vibrate,
+    'soundOnLog': soundOnLog,
   };
 
   factory WaterSettings.fromJson(Map<String, dynamic> json) {
@@ -162,6 +170,8 @@ class WaterSettings {
           : _clampInt(_asInt(json['amountPerReminderMl'], 250), 10, 5000),
       use24hClock: _asBool(json['use24hClock'], false),
       vibrate: _asBool(json['vibrate'], true),
+      // Additive: a backup written before this existed simply gets the default.
+      soundOnLog: _asBool(json['soundOnLog'], true),
     );
   }
 }

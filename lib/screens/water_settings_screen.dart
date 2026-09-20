@@ -4,6 +4,7 @@ import '../models/time_of_day_x.dart';
 import '../models/volume_unit.dart';
 import '../models/water_settings.dart';
 import '../services/notification_service.dart';
+import '../services/sound_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/format.dart';
@@ -605,6 +606,18 @@ class _DeliveryPanelState extends State<_DeliveryPanel> {
             title: const Text('Vibrate'),
           ),
           const Divider(height: 1),
+          // Hidden where the channel is unimplemented, rather than offered as a
+          // switch that would quietly do nothing.
+          if (SoundService.isSupported) ...[
+            SwitchListTile(
+              value: settings.soundOnLog,
+              onChanged: (value) =>
+                  widget.onChanged(settings.copyWith(soundOnLog: value)),
+              title: const Text('Sound when you log a drink'),
+              subtitle: const Text('Follows your media volume'),
+            ),
+            const Divider(height: 1),
+          ],
           SwitchListTile(
             value: settings.use24hClock,
             onChanged: (value) =>

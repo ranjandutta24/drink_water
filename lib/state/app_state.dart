@@ -6,6 +6,7 @@ import '../models/water_log.dart';
 import '../models/water_settings.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
+import '../services/sound_service.dart';
 import '../services/storage_service.dart';
 import '../theme.dart' show AppFont;
 
@@ -121,6 +122,9 @@ class AppState extends ChangeNotifier {
 
   // --- Water log ------------------------------------------------------------
 
+  /// Only ever called for a drink the user logged by hand, which is why it may
+  /// make a noise. Imports go through [importBundle] and the notification action
+  /// writes SharedPreferences from its own isolate; neither comes through here.
   Future<void> addWater(int amountMl, {DateTime? at}) async {
     if (amountMl <= 0) return;
     final entry = WaterEntry(
@@ -130,6 +134,13 @@ class AppState extends ChangeNotifier {
     );
     _waterLog = [entry, ..._waterLog];
     notifyListeners();
+
+    // Fired before the write and deliberately not awaited: the sound should land
+    // with the tap, not after SharedPreferences has been flushed to disk.
+    if (_settings.soundOnLog) {
+      SoundService.instance.playSwallow();
+    }
+
     await _storage.saveWaterLog(_waterLog);
   }
 

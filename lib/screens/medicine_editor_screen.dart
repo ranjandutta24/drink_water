@@ -28,7 +28,22 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
   late MealRelation _mealRelation;
   late int _colorIndex;
 
+  late MedicineSchedule _schedule;
+  late int _intervalHours;
+  late TimeOfDay _intervalStart;
+  late TimeOfDay _intervalEnd;
+
   bool get _isNew => widget.existing == null;
+
+  /// What will actually be saved: the hand-picked list, or the times the
+  /// interval rule works out to.
+  List<TimeOfDay> get _resolvedTimes => _schedule == MedicineSchedule.interval
+      ? Medicine.buildIntervalTimes(
+          intervalHours: _intervalHours,
+          start: _intervalStart,
+          end: _intervalEnd,
+        )
+      : _times;
 
   @override
   void initState() {
@@ -43,6 +58,12 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
     if (_times.isEmpty) _times = [const TimeOfDay(hour: 9, minute: 0)];
     _mealRelation = existing?.mealRelation ?? MealRelation.none;
     _colorIndex = existing?.colorIndex ?? 0;
+    _schedule = existing?.schedule ?? MedicineSchedule.times;
+    _intervalHours = existing?.intervalHours ?? Medicine.kDefaultIntervalHours;
+    _intervalStart =
+        existing?.intervalStart ?? const TimeOfDay(hour: 8, minute: 0);
+    _intervalEnd =
+        existing?.intervalEnd ?? const TimeOfDay(hour: 22, minute: 0);
   }
 
   @override
@@ -101,13 +122,31 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
             ),
             const SizedBox(height: 22),
             const SectionHeader(title: 'Times of day'),
-            _TimesPanel(
-              times: _times,
-              use24h: use24h,
-              onAdd: _addTime,
-              onEdit: _editTime,
-              onRemove: (index) => setState(() => _times.removeAt(index)),
+            _ScheduleModePicker(
+              selected: _schedule,
+              onSelected: (schedule) => setState(() => _schedule = schedule),
             ),
+            const SizedBox(height: 12),
+            if (_schedule == MedicineSchedule.times)
+              _TimesPanel(
+                times: _times,
+                use24h: use24h,
+                onAdd: _addTime,
+                onEdit: _editTime,
+                onRemove: (index) => setState(() => _times.removeAt(index)),
+              )
+            else
+              _IntervalPanel(
+                intervalHours: _intervalHours,
+                start: _intervalStart,
+                end: _intervalEnd,
+                generated: _resolvedTimes,
+                use24h: use24h,
+                onIntervalChanged: (hours) =>
+                    setState(() => _intervalHours = hours),
+                onPickStart: () => _pickWindowEdge(isStart: true),
+                onPickEnd: () => _pickWindowEdge(isStart: false),
+              ),
             const SizedBox(height: 22),
             const SectionHeader(title: 'Days'),
             _WeekdayPanel(
@@ -200,7 +239,7 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
               ),
             ),
             const SizedBox(height: 22),
-            _SummaryLine(times: _times.length, days: _weekdays.length),
+            _SummaryLine(times: _resolvedTimes.length, days: _weekdays.length),
           ],
         ),
       ),
@@ -217,6 +256,12 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
   }
 
   Future<void> _addTime() async {
+    // The notification id scheme allots two digits per time slot, so the
+    // hand-picked list needs the same ceiling the generated one has.
+    if (_times.length >= Medicine.maxIntervalTimes) {
+      _snack('That is as many times a day as a reminder can hold');
+      return;
+    }
     final picked = await showTimePicker(
       context: context,
       initialTime: const TimeOfDay(hour: 9, minute: 0),
@@ -227,6 +272,22 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
       return;
     }
     setState(() => _times.add(picked));
+  }
+
+  Future<void> _pickWindowEdge({required bool isStart}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _intervalStart : _intervalEnd,
+      helpText: isStart ? 'First reminder of the day' : 'Stop reminding after',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (isStart) {
+        _intervalStart = picked;
+      } else {
+        _intervalEnd = picked;
+      }
+    });
   }
 
   Future<void> _editTime(int index) async {
@@ -245,8 +306,13 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_times.isEmpty) {
-      _snack('Add at least one time of day');
+    final times = _resolvedTimes;
+    if (times.isEmpty) {
+      _snack(
+        _schedule == MedicineSchedule.interval
+            ? 'That window is too short for this interval'
+            : 'Add at least one time of day',
+      );
       return;
     }
     if (_weekdays.isEmpty) {
@@ -261,9 +327,15 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
       notes: _notes.text.trim(),
       mealRelation: _mealRelation,
       weekdays: _weekdays,
-      times: _times,
+      // Stored materialised either way, so scheduling and history never have to
+      // know which mode produced them.
+      times: times,
       enabled: widget.existing?.enabled ?? true,
       colorIndex: _colorIndex,
+      schedule: _schedule,
+      intervalHours: _intervalHours,
+      intervalStart: _intervalStart,
+      intervalEnd: _intervalEnd,
     );
 
     final navigator = Navigator.of(context);
@@ -301,6 +373,273 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
     await AppScope.read(context).deleteMedicine(widget.existing!.id);
     if (!mounted) return;
     navigator.pop();
+  }
+}
+
+/// Chooses between hand-picked times and a repeating interval. Two rows rather
+/// than a segmented control so each option can carry its one-line explanation.
+class _ScheduleModePicker extends StatelessWidget {
+  const _ScheduleModePicker({required this.selected, required this.onSelected});
+
+  final MedicineSchedule selected;
+  final ValueChanged<MedicineSchedule> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Panel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (final schedule in MedicineSchedule.values) ...[
+            if (schedule != MedicineSchedule.values.first)
+              Divider(height: 1, color: palette.hairline),
+            Semantics(
+              button: true,
+              selected: selected == schedule,
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: () => onSelected(schedule),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 13,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          schedule == MedicineSchedule.times
+                              ? Icons.schedule_outlined
+                              : Icons.repeat_rounded,
+                          size: 20,
+                          color: selected == schedule
+                              ? palette.aquaDeep
+                              : palette.inkSoft,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                schedule.label,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: selected == schedule
+                                      ? palette.aquaDeep
+                                      : palette.ink,
+                                ),
+                              ),
+                              Text(
+                                schedule.note,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          selected == schedule
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: 20,
+                          color: selected == schedule
+                              ? palette.aqua
+                              : palette.inkSoft,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The interval editor: how often, between which hours, and what that works out
+/// to. The generated list is shown because "every 4 hours" alone hides whether
+/// the last dose lands at a sensible hour.
+class _IntervalPanel extends StatelessWidget {
+  const _IntervalPanel({
+    required this.intervalHours,
+    required this.start,
+    required this.end,
+    required this.generated,
+    required this.use24h,
+    required this.onIntervalChanged,
+    required this.onPickStart,
+    required this.onPickEnd,
+  });
+
+  final int intervalHours;
+  final TimeOfDay start;
+  final TimeOfDay end;
+  final List<TimeOfDay> generated;
+  final bool use24h;
+  final ValueChanged<int> onIntervalChanged;
+  final VoidCallback onPickStart;
+  final VoidCallback onPickEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Remind me', style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final hours in Medicine.intervalChoices)
+                ChoiceChip(
+                  label: Text(hours == 1 ? 'Hourly' : 'Every $hours h'),
+                  selected: intervalHours == hours,
+                  showCheckmark: false,
+                  backgroundColor: palette.panel,
+                  selectedColor: palette.aquaWash,
+                  side: BorderSide(
+                    color: intervalHours == hours
+                        ? palette.aqua
+                        : palette.hairline,
+                  ),
+                  labelStyle: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: intervalHours == hours
+                        ? palette.aquaDeep
+                        : palette.ink,
+                  ),
+                  onSelected: (_) => onIntervalChanged(hours),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _WindowEdge(
+                  label: 'From',
+                  time: start,
+                  use24h: use24h,
+                  onTap: onPickStart,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _WindowEdge(
+                  label: 'Until',
+                  time: end,
+                  use24h: use24h,
+                  onTap: onPickEnd,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            generated.isEmpty
+                ? 'No reminders fit — widen the window or pick a shorter '
+                      'interval.'
+                : 'That works out to ${generated.length} '
+                      'reminder${generated.length == 1 ? '' : 's'} a day:',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (generated.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final time in generated)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.aquaWash,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      formatTime(time, use24h: use24h),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: palette.aquaDeep,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WindowEdge extends StatelessWidget {
+  const _WindowEdge({
+    required this.label,
+    required this.time,
+    required this.use24h,
+    required this.onTap,
+  });
+
+  final String label;
+  final TimeOfDay time;
+  final bool use24h;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Semantics(
+      button: true,
+      label: '$label ${formatTime(time, use24h: use24h)}',
+      excludeSemantics: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 2),
+                Text(
+                  formatTime(time, use24h: use24h),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: palette.ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -347,11 +686,11 @@ class _TimesPanel extends StatelessWidget {
             const Divider(height: 1),
           ],
           ListTile(
-            leading: Icon(Icons.add, color: AppColors.of(context).iris),
+            leading: Icon(Icons.add, color: AppColors.of(context).aquaDeep),
             title: Text(
               'Add a time',
               style: TextStyle(
-                color: AppColors.of(context).iris,
+                color: AppColors.of(context).aquaDeep,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -406,12 +745,12 @@ class _WeekdayPanel extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: selected.contains(day)
-                            ? AppColors.of(context).iris
+                            ? AppColors.of(context).aqua
                             : AppColors.of(context).panel,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: selected.contains(day)
-                              ? AppColors.of(context).iris
+                              ? AppColors.of(context).aqua
                               : AppColors.of(context).hairline,
                         ),
                       ),

@@ -82,7 +82,9 @@ class MedicinesScreen extends StatelessWidget {
     for (final medicine in medicines) {
       if (!medicine.enabled) continue;
       if (!medicine.weekdays.contains(weekday)) continue;
-      for (final time in medicine.sortedTimes) {
+      // effectiveTimes, not sortedTimes: this list has to agree with what the
+      // scheduler actually queues, which derives interval times from the rule.
+      for (final time in medicine.effectiveTimes) {
         doses.add(_Dose(medicine: medicine, time: time));
       }
     }
@@ -234,7 +236,15 @@ class _MedicineCard extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final time in medicine.sortedTimes)
+              // An interval medicine gets one chip describing the rule. Listing
+              // its generated times would fill the card with a dozen of them and
+              // still not say "every 4 hours".
+              for (final label
+                  in medicine.schedule == MedicineSchedule.interval
+                      ? [medicine.scheduleLabel(use24h: use24h)]
+                      : medicine.sortedTimes
+                            .map((time) => formatTime(time, use24h: use24h))
+                            .toList())
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -247,7 +257,7 @@ class _MedicineCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    formatTime(time, use24h: use24h),
+                    label,
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
