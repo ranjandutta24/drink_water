@@ -136,9 +136,7 @@ class BackupService {
     }
 
     if (settingsJson == null && medicines.isEmpty && waterLog.isEmpty) {
-      throw BackupParseException(
-        'No settings or history found in this file.',
-      );
+      throw BackupParseException('No settings or history found in this file.');
     }
 
     return BackupBundle(

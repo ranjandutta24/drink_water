@@ -48,10 +48,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// Picks up writes made by the background notification isolate.
+  /// The reload is essential: SharedPreferences keeps an in-memory snapshot per
+  /// isolate, so without it we would re-read our own stale copy.
   Future<void> reloadFromDisk() async {
-    final fresh = await StorageService.open();
-    _waterLog = _pruneOldEntries(fresh.loadWaterLog());
-    _medicineLog = fresh.loadMedicineLog();
+    await _storage.reload();
+    _waterLog = _pruneOldEntries(_storage.loadWaterLog());
+    _medicineLog = _storage.loadMedicineLog();
     notifyListeners();
   }
 
@@ -59,6 +61,7 @@ class AppState extends ChangeNotifier {
   /// than trying to reach into the UI isolate.
   Future<void> consumePendingBackgroundWrites() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     if (prefs.getBool(kPendingRefreshKey) == true) {
       await prefs.setBool(kPendingRefreshKey, false);
       await reloadFromDisk();
@@ -68,9 +71,9 @@ class AppState extends ChangeNotifier {
   /// Keeps two years of history so reports stay fast and prefs stay small.
   List<WaterEntry> _pruneOldEntries(List<WaterEntry> entries) {
     final cutoff = DateTime.now().subtract(const Duration(days: 730));
-    final kept = entries.where((entry) => entry.timestamp.isAfter(cutoff))
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final kept =
+        entries.where((entry) => entry.timestamp.isAfter(cutoff)).toList()
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return kept;
   }
 
@@ -142,7 +145,10 @@ class AppState extends ChangeNotifier {
     await applySchedule();
   }
 
-  Future<void> recordMedicineTaken(String medicineId, {bool skipped = false}) async {
+  Future<void> recordMedicineTaken(
+    String medicineId, {
+    bool skipped = false,
+  }) async {
     _medicineLog = [
       MedicineIntake(
         medicineId: medicineId,

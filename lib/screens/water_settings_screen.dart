@@ -205,12 +205,14 @@ class _TimeRow extends StatelessWidget {
       title: Text(label),
       trailing: Text(
         formatTime(time, use24h: use24h),
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: AppColors.aquaDeep,
-        ),
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(color: AppColors.aquaDeep),
       ),
       onTap: () async {
-        final picked = await showTimePicker(context: context, initialTime: time);
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: time,
+        );
         if (picked != null) onPicked(picked);
       },
     );
@@ -254,7 +256,8 @@ class _UnitsPanel extends StatelessWidget {
           _SizeField(
             label: 'One glass holds',
             valueMl: settings.glassSizeMl,
-            onChanged: (value) => onChanged(settings.copyWith(glassSizeMl: value)),
+            onChanged: (value) =>
+                onChanged(settings.copyWith(glassSizeMl: value)),
           ),
           const SizedBox(height: 12),
           _SizeField(
@@ -371,10 +374,7 @@ class _GoalPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.displayMedium,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'a day',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                Text('a day', style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
@@ -428,10 +428,7 @@ class _StepperButton extends StatelessWidget {
 }
 
 class _ReminderAmountPanel extends StatelessWidget {
-  const _ReminderAmountPanel({
-    required this.settings,
-    required this.onChanged,
-  });
+  const _ReminderAmountPanel({required this.settings, required this.onChanged});
 
   final WaterSettings settings;
   final ValueChanged<WaterSettings> onChanged;
@@ -463,8 +460,9 @@ class _ReminderAmountPanel extends StatelessWidget {
               ),
               if (custom)
                 TextButton(
-                  onPressed: () =>
-                      onChanged(settings.copyWith(clearAmountPerReminder: true)),
+                  onPressed: () => onChanged(
+                    settings.copyWith(clearAmountPerReminder: true),
+                  ),
                   child: const Text('Clear'),
                 ),
               TextButton(
@@ -498,9 +496,9 @@ class _ReminderAmountPanel extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(
-              dialogContext,
-            ).pop(int.tryParse(controller.text.trim())),
+            onPressed: () =>
+                Navigator.of(dialogContext)
+                    .pop(int.tryParse(controller.text.trim())),
             child: const Text('Save'),
           ),
         ],
@@ -568,7 +566,8 @@ class _DeliveryPanelState extends State<_DeliveryPanel> {
           const Divider(height: 1),
           if (_notificationsAllowed == false)
             _PermissionRow(
-              message: 'Notifications are blocked for this app. '
+              message:
+                  'Notifications are blocked for this app. '
                   'Turn them on to receive reminders.',
               actionLabel: 'Allow notifications',
               onPressed: () async {
@@ -578,7 +577,8 @@ class _DeliveryPanelState extends State<_DeliveryPanel> {
             ),
           if (_exactAllowed == false)
             _PermissionRow(
-              message: 'Exact alarms are off, so reminders may arrive a few '
+              message:
+                  'Exact alarms are off, so reminders may arrive a few '
                   'minutes late while the phone is asleep.',
               actionLabel: 'Allow exact alarms',
               onPressed: () async {

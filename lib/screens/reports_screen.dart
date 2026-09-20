@@ -435,7 +435,9 @@ double _chartMax(PeriodReport report, WaterSettings settings) {
 
 bool _isToday(DateTime date) {
   final now = DateTime.now();
-  return date.year == now.year && date.month == now.month && date.day == now.day;
+  return date.year == now.year &&
+      date.month == now.month &&
+      date.day == now.day;
 }
 
 class _StreakPanel extends StatelessWidget {

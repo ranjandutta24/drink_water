@@ -127,10 +127,7 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Food',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  Text('Food', style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
@@ -201,10 +198,7 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
               ),
             ),
             const SizedBox(height: 22),
-            _SummaryLine(
-              times: _times.length,
-              days: _weekdays.length,
-            ),
+            _SummaryLine(times: _times.length, days: _weekdays.length),
           ],
         ),
       ),
@@ -225,7 +219,7 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
       context: context,
       initialTime: const TimeOfDay(hour: 9, minute: 0),
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     if (_times.any((time) => time.minutesOfDay == picked.minutesOfDay)) {
       _snack('That time is already on the list');
       return;
@@ -238,14 +232,13 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
       context: context,
       initialTime: _times[index],
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() => _times[index] = picked);
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _save() async {
@@ -325,9 +318,7 @@ class _TimesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final indexed = List.generate(times.length, (index) => index)
-      ..sort(
-        (a, b) => times[a].minutesOfDay.compareTo(times[b].minutesOfDay),
-      );
+      ..sort((a, b) => times[a].minutesOfDay.compareTo(times[b].minutesOfDay));
 
     return Panel(
       padding: EdgeInsets.zero,
@@ -482,9 +473,8 @@ class _SummaryLine extends StatelessWidget {
               total == 0
                   ? 'Pick at least one day and one time.'
                   : 'That is $total reminder${total == 1 ? '' : 's'} a week.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.marine,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: AppColors.marine),
             ),
           ),
         ],

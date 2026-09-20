@@ -39,21 +39,26 @@ class _DrinkWaterAppState extends State<DrinkWaterApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Drink Water',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: FutureBuilder<AppState>(
-        future: _bootstrap,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _StartupError(error: snapshot.error!);
-          }
-          final state = snapshot.data;
-          if (state == null) return const _Splash();
-          return AppScope(state: state, child: const ShellScreen());
-        },
-      ),
+    return FutureBuilder<AppState>(
+      future: _bootstrap,
+      builder: (context, snapshot) {
+        final state = snapshot.data;
+        return MaterialApp(
+          title: 'Drink Water',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          // The scope has to sit above the Navigator, otherwise pushed routes
+          // are siblings of `home` and cannot see it.
+          builder: state == null
+              ? null
+              : (context, child) => AppScope(state: state, child: child!),
+          home: snapshot.hasError
+              ? _StartupError(error: snapshot.error!)
+              : state == null
+              ? const _Splash()
+              : const ShellScreen(),
+        );
+      },
     );
   }
 }
@@ -92,11 +97,7 @@ class _StartupError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 34,
-                color: AppColors.clay,
-              ),
+              const Icon(Icons.error_outline, size: 34, color: AppColors.clay),
               const SizedBox(height: 14),
               Text(
                 'The app could not load your data',

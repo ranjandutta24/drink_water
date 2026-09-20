@@ -42,6 +42,14 @@ Future<void> _recordFromAction(NotificationResponse response) async {
   if (actionId == null) return;
 
   try {
+    if (actionId == kActionSnooze) {
+      // Nothing was logged, so there is no data for the UI to pick up — just
+      // lay down a new alarm. Works from the background isolate too because
+      // snoozeWater initialises the plugin and time zone itself.
+      await NotificationService.instance.snoozeWater(response.payload);
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
 
     if (actionId == kActionDrank) {
@@ -149,10 +157,6 @@ class NotificationService {
   }
 
   void _onForegroundResponse(NotificationResponse response) {
-    if (response.actionId == kActionSnooze) {
-      _snoozeWater(response.payload);
-      return;
-    }
     if (response.actionId != null) {
       _recordFromAction(response).then((_) {
         dataChanged.value++;
@@ -357,7 +361,10 @@ class NotificationService {
     return bits.join(' · ');
   }
 
-  Future<void> _snoozeWater(String? payload) async {
+  /// Re-fires the water reminder a quarter of an hour later. Public because the
+  /// background isolate reaches it through the singleton.
+  Future<void> snoozeWater(String? payload) async {
+    await init();
     final amount = int.tryParse('$payload') ?? 250;
     final exact = await canScheduleExactAlarms();
     await _plugin.zonedSchedule(

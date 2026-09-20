@@ -175,10 +175,9 @@ class _BackupScreenState extends State<BackupScreen> {
   // --- Export ---------------------------------------------------------------
 
   Future<void> _exportToFile() async {
-    final state = AppScope.read(context);
+    final json = AppScope.read(context).exportJson();
     setState(() => _busy = true);
     try {
-      final json = state.exportJson();
       final bytes = Uint8List.fromList(utf8.encode(json));
       final fileName = BackupService.suggestedFileName();
 
@@ -202,19 +201,18 @@ class _BackupScreenState extends State<BackupScreen> {
 
       _snack('Backup saved as $fileName');
     } catch (error) {
-      await _fallbackExport(error);
+      await _fallbackExport(json, error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   /// If the system picker fails, still give the user a real file.
-  Future<void> _fallbackExport(Object error) async {
+  Future<void> _fallbackExport(String json, Object error) async {
     try {
-      final state = AppScope.read(context);
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/${BackupService.suggestedFileName()}');
-      await file.writeAsString(state.exportJson(), flush: true);
+      await file.writeAsString(json, flush: true);
       _snack('Saved inside the app folder: ${file.path}');
     } catch (_) {
       _snack('Could not save the file. Copy the JSON instead. ($error)');
@@ -307,7 +305,9 @@ class _BackupScreenState extends State<BackupScreen> {
           controller: controller,
           maxLines: 8,
           minLines: 5,
-          decoration: const InputDecoration(hintText: '{ "app": "drink_water" …'),
+          decoration: const InputDecoration(
+            hintText: '{ "app": "drink_water" …',
+          ),
         ),
         actions: [
           TextButton(
@@ -420,8 +420,7 @@ class _BackupScreenState extends State<BackupScreen> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }

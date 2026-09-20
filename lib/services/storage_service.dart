@@ -23,6 +23,11 @@ class StorageService {
     return StorageService(prefs);
   }
 
+  /// Pulls in changes written by another isolate (the notification handler).
+  /// SharedPreferences caches values per isolate, so this is required before
+  /// re-reading anything the background handler may have touched.
+  Future<void> reload() => _prefs.reload();
+
   // --- Water settings -------------------------------------------------------
 
   WaterSettings loadSettings() {
@@ -30,7 +35,8 @@ class StorageService {
     if (raw == null || raw.isEmpty) return const WaterSettings();
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return WaterSettings.fromJson(decoded);
+      if (decoded is Map<String, dynamic>)
+        return WaterSettings.fromJson(decoded);
     } catch (_) {
       // Corrupt payload: fall back to defaults rather than crash on launch.
     }

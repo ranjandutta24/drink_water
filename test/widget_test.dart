@@ -113,11 +113,13 @@ void main() {
       final now = DateTime.now();
       final entries = <WaterEntry>[];
       daysAgoToMl.forEach((daysAgo, ml) {
-        final date = DateTime(now.year, now.month, now.day, 12)
-            .subtract(Duration(days: daysAgo));
-        entries.add(
-          WaterEntry(id: 'e$daysAgo', timestamp: date, amountMl: ml),
-        );
+        final date = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          12,
+        ).subtract(Duration(days: daysAgo));
+        entries.add(WaterEntry(id: 'e$daysAgo', timestamp: date, amountMl: ml));
       });
       return entries;
     }
@@ -143,7 +145,10 @@ void main() {
     });
 
     test('a weekly report always covers seven days', () {
-      final service = ReportService(entries: entriesFor({0: 500}), goalMl: 2000);
+      final service = ReportService(
+        entries: entriesFor({0: 500}),
+        goalMl: 2000,
+      );
       expect(service.weekReport().days.length, 7);
       expect(service.weekReport(weeksAgo: 1).days.length, 7);
     });

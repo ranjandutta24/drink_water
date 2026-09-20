@@ -34,7 +34,9 @@ class Panel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (accent != null) Container(width: 4, color: accent),
-            Expanded(child: Padding(padding: padding, child: child)),
+            Expanded(
+              child: Padding(padding: padding, child: child),
+            ),
           ],
         ),
       ),
@@ -129,9 +131,8 @@ class StatTile extends StatelessWidget {
       children: [
         Text(
           value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: color ?? AppColors.marine,
-          ),
+          style: Theme.of(context).textTheme.titleLarge
+              ?.copyWith(color: color ?? AppColors.marine),
         ),
         const SizedBox(height: 2),
         Text(label, style: Theme.of(context).textTheme.bodySmall),

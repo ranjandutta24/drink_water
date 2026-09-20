@@ -69,9 +69,10 @@ class _WaterVesselState extends State<WaterVessel>
 
   void _animateTo(double target) {
     final clamped = target.clamp(0.0, 1.0);
-    _level = Tween<double>(begin: _shownProgress, end: clamped).animate(
-      CurvedAnimation(parent: _fill, curve: Curves.easeOutCubic),
-    );
+    _level = Tween<double>(
+      begin: _shownProgress,
+      end: clamped,
+    ).animate(CurvedAnimation(parent: _fill, curve: Curves.easeOutCubic));
     _shownProgress = clamped;
     _fill
       ..reset()
@@ -258,7 +259,8 @@ class _VesselPainter extends CustomPainter {
     final path = Path()..moveTo(0, waterTop);
     for (double x = 0; x <= size.width; x += 4) {
       final y =
-          waterTop + math.sin((x / size.width * 2 * math.pi) + phase) * amplitude;
+          waterTop +
+          math.sin((x / size.width * 2 * math.pi) + phase) * amplitude;
       path.lineTo(x, y);
     }
     path

@@ -45,10 +45,7 @@ ThemeData buildAppTheme() {
 
   return base.copyWith(
     textTheme: base.textTheme
-        .apply(
-          bodyColor: AppColors.marine,
-          displayColor: AppColors.marine,
-        )
+        .apply(bodyColor: AppColors.marine, displayColor: AppColors.marine)
         .copyWith(
           // Large numerals are the centrepiece of this app, so the display
           // sizes are set tight and heavy rather than airy.
@@ -142,9 +139,7 @@ ThemeData buildAppTheme() {
         foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(52),
         textStyle: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -153,9 +148,7 @@ ThemeData buildAppTheme() {
         minimumSize: const Size.fromHeight(52),
         side: const BorderSide(color: AppColors.hairline),
         textStyle: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(

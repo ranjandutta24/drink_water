@@ -86,9 +86,7 @@ class MedicinesScreen extends StatelessWidget {
         doses.add(_Dose(medicine: medicine, time: time));
       }
     }
-    doses.sort(
-      (a, b) => a.time.minutesOfDay.compareTo(b.time.minutesOfDay),
-    );
+    doses.sort((a, b) => a.time.minutesOfDay.compareTo(b.time.minutesOfDay));
     return doses;
   }
 
@@ -182,8 +180,9 @@ class _MedicineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.read(context);
-    final accent = AppColors
-        .medicinePalette[medicine.colorIndex % AppColors.medicinePalette.length];
+    final accent =
+        AppColors.medicinePalette[medicine.colorIndex %
+            AppColors.medicinePalette.length];
 
     return Panel(
       accent: medicine.enabled ? accent : AppColors.hairline,
@@ -226,8 +225,7 @@ class _MedicineCard extends StatelessWidget {
               ),
               Switch(
                 value: medicine.enabled,
-                onChanged: (value) =>
-                    state.toggleMedicine(medicine.id, value),
+                onChanged: (value) => state.toggleMedicine(medicine.id, value),
               ),
             ],
           ),

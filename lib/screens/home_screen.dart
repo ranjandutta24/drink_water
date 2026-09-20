@@ -29,10 +29,9 @@ class HomeScreen extends StatelessWidget {
         : todayMl / settings.dailyGoalMl;
     final remaining = settings.dailyGoalMl - todayMl;
 
-    final todayEntries =
-        state.waterLog
-            .where((entry) => entry.dayKey == WaterEntry.dayKeyFor(DateTime.now()))
-            .toList();
+    final todayEntries = state.waterLog
+        .where((entry) => entry.dayKey == WaterEntry.dayKeyFor(DateTime.now()))
+        .toList();
 
     return Scaffold(
       body: SafeArea(
@@ -71,8 +70,7 @@ class HomeScreen extends StatelessWidget {
               const EmptyState(
                 icon: Icons.water_drop_outlined,
                 title: 'Nothing logged yet',
-                message:
-                    'Tap an amount above to record your first drink of the day.',
+                message: 'Tap an amount above to record your first drink of the day.',
               )
             else
               _TodayLog(entries: todayEntries, settings: settings),
@@ -154,9 +152,8 @@ class _NextReminderLine extends StatelessWidget {
 
     return Panel(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const WaterSettingsScreen()),
-      ),
+      onTap: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const WaterSettingsScreen())),
       child: Row(
         children: [
           Icon(
@@ -344,15 +341,14 @@ Future<void> _openCustomAmountSheet(
                 labelText: 'Amount',
                 suffixText: settings.displayUnit.shortLabel,
               ),
-              onSubmitted: (value) => Navigator.of(
-                sheetContext,
-              ).pop(_parseToMl(value, settings)),
+              onSubmitted: (value) =>
+                  Navigator.of(sheetContext).pop(_parseToMl(value, settings)),
             ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () => Navigator.of(
-                sheetContext,
-              ).pop(_parseToMl(controller.text, settings)),
+              onPressed: () =>
+                  Navigator.of(sheetContext)
+                      .pop(_parseToMl(controller.text, settings)),
               child: const Text('Log it'),
             ),
           ],

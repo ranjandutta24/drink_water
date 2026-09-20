@@ -15,8 +15,7 @@ class ShellScreen extends StatefulWidget {
   State<ShellScreen> createState() => _ShellScreenState();
 }
 
-class _ShellScreenState extends State<ShellScreen>
-    with WidgetsBindingObserver {
+class _ShellScreenState extends State<ShellScreen> with WidgetsBindingObserver {
   int _index = 0;
 
   @override
