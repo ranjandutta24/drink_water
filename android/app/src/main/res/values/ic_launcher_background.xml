@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The plate behind the adaptive icon's foreground. Kept white in both
+         light and dark mode: the artwork is mid-blue and green, which needs a
+         bright ground to stay legible at 48dp. -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
+</resources>

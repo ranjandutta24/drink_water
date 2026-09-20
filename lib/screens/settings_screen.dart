@@ -175,9 +175,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 22),
+          const SectionHeader(title: 'About'),
+          _AboutPanel(onCopyEmail: _copyFeedbackEmail),
         ],
       ),
     );
+  }
+
+  Future<void> _copyFeedbackEmail() async {
+    await Clipboard.setData(const ClipboardData(text: kFeedbackEmail));
+    _snack('Email address copied — $kFeedbackEmail');
   }
 
   // --- Export ---------------------------------------------------------------
@@ -432,6 +440,162 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// Shown in About and copied to the clipboard on tap. Declared here rather than
+/// inline so there is exactly one place to change it.
+const String kFeedbackEmail = 'connecttoranjan@gmail.com';
+const String kAppVersion = '1.0.0';
+const String kAuthorName = 'Ranjan Dutta';
+
+/// Who made this, what it does, and where to send feedback.
+///
+/// The email is copied to the clipboard rather than opened in a mail client:
+/// launching a mailto: intent would mean taking on url_launcher, and copying
+/// works even on a phone with no mail app configured.
+class _AboutPanel extends StatelessWidget {
+  const _AboutPanel({required this.onCopyEmail});
+
+  final Future<void> Function() onCopyEmail;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: palette.aquaWash,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.water_drop_rounded,
+                  color: palette.aquaDeep,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Drink Water', style: text.titleMedium),
+                    const SizedBox(height: 2),
+                    Text('Version $kAppVersion', style: text.bodySmall),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'A quiet companion for two habits that are easy to forget: drinking '
+            'enough water and taking your medicine on time.',
+            style: text.bodyMedium,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Set an interval and a daily target, and reminders arrive on their '
+            'own — even when the app is closed. Add as many medicines as you '
+            'need, each with its own days and times. Log a drink or a dose '
+            'straight from the notification, and look back over your week or '
+            'month whenever you want to see how you are doing.',
+            style: text.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'There is no account, no sign-in and no server. Everything lives on '
+            'this phone, and the only copy that ever leaves it is a backup file '
+            'you save yourself.',
+            style: text.bodySmall,
+          ),
+          const SizedBox(height: 18),
+          Divider(height: 1, color: palette.hairline),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.code_rounded, size: 16, color: palette.inkSoft),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    style: text.bodySmall,
+                    children: [
+                      const TextSpan(text: 'Developed by '),
+                      TextSpan(
+                        text: kAuthorName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: palette.ink,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'For your feedback please email to',
+            style: text.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: onCopyEmail,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: palette.aquaWash,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: palette.hairline),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.mail_outline_rounded,
+                      size: 17,
+                      color: palette.aquaDeep,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        kFeedbackEmail,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: palette.aquaDeep,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.copy_rounded,
+                      size: 15,
+                      color: palette.aquaDeep,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

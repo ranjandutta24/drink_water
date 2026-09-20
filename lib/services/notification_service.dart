@@ -1,6 +1,8 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+// material (not just foundation) for Color; ValueNotifier and debugPrint come
+// along with it.
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +25,12 @@ const String kActionSkip = 'medicine_skip';
 const int _waterIdBase = 1000;
 const int _waterSnoozeId = 999;
 const int _medicineIdBase = 100000;
+
+/// Tint Android applies to the small icon and the app name in the shade. Hard
+/// coded rather than read from the theme: notifications are built in a
+/// background isolate that has no BuildContext, and the brand colour is the same
+/// in both themes.
+const Color _notificationAccent = Color(0xFF1B9AAA);
 
 /// Signals the UI (when it is alive) that a background isolate changed data.
 const String kPendingRefreshKey = 'pending_refresh_v1';
@@ -127,8 +135,11 @@ class NotificationService {
     tzdata.initializeTimeZones();
     await _configureLocalTimeZone();
 
+    // A dedicated status-bar icon rather than the launcher icon: Android masks
+    // small icons to their alpha channel, so a full-colour launcher icon with
+    // an opaque plate renders as a solid white square.
     const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
+      '@drawable/ic_notification',
     );
     await _plugin.initialize(
       const InitializationSettings(android: androidSettings),
@@ -245,6 +256,7 @@ class NotificationService {
             channelDescription: _waterChannel.description,
             importance: Importance.high,
             priority: Priority.high,
+            color: _notificationAccent,
             enableVibration: settings.vibrate,
             category: AndroidNotificationCategory.reminder,
             actions: const [
@@ -319,6 +331,7 @@ class NotificationService {
                 channelDescription: _medicineChannel.description,
                 importance: Importance.max,
                 priority: Priority.high,
+                color: _notificationAccent,
                 category: AndroidNotificationCategory.alarm,
                 actions: const [
                   AndroidNotificationAction(
@@ -383,6 +396,7 @@ class NotificationService {
           channelDescription: _waterChannel.description,
           importance: Importance.high,
           priority: Priority.high,
+          color: _notificationAccent,
           actions: const [
             AndroidNotificationAction(
               kActionDrank,
@@ -414,6 +428,7 @@ class NotificationService {
           channelDescription: _waterChannel.description,
           importance: Importance.high,
           priority: Priority.high,
+          color: _notificationAccent,
           actions: const [
             AndroidNotificationAction(
               kActionDrank,
