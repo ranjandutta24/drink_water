@@ -312,32 +312,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _importFromPaste() async {
-    final controller = TextEditingController();
     final raw = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Paste your backup JSON'),
-        content: TextField(
-          controller: controller,
-          maxLines: 8,
-          minLines: 5,
-          decoration: const InputDecoration(
-            hintText: '{ "app": "drink_water" …',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text('Read it'),
-          ),
-        ],
-      ),
+      builder: (_) => const _PasteJsonDialog(),
     );
-    controller.dispose();
     if (raw == null || raw.trim().isEmpty) return;
     await _applyImport(raw);
   }
@@ -443,6 +421,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+/// Owns its own controller so it lives exactly as long as the dialog does — see
+/// the note on _AmountDialog in water_settings_screen.dart.
+class _PasteJsonDialog extends StatefulWidget {
+  const _PasteJsonDialog();
+
+  @override
+  State<_PasteJsonDialog> createState() => _PasteJsonDialogState();
+}
+
+class _PasteJsonDialogState extends State<_PasteJsonDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Paste your backup JSON'),
+      content: TextField(
+        controller: _controller,
+        maxLines: 8,
+        minLines: 5,
+        decoration: const InputDecoration(hintText: '{ "app": "drink_water" …'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Read it'),
+        ),
+      ],
+    );
+  }
+}
+
 /// Shown in About and copied to the clipboard on tap. Declared here rather than
 /// inline so there is exactly one place to change it.
 const String kFeedbackEmail = 'connecttoranjan@gmail.com';
@@ -545,10 +565,7 @@ class _AboutPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            'For your feedback please email to',
-            style: text.bodySmall,
-          ),
+          Text('For your feedback please email to', style: text.bodySmall),
           const SizedBox(height: 8),
           Material(
             type: MaterialType.transparency,
@@ -583,11 +600,7 @@ class _AboutPanel extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(
-                      Icons.copy_rounded,
-                      size: 15,
-                      color: palette.aquaDeep,
-                    ),
+                    Icon(Icons.copy_rounded, size: 15, color: palette.aquaDeep),
                   ],
                 ),
               ),

@@ -477,37 +477,65 @@ class _ReminderAmountPanel extends StatelessWidget {
   }
 
   Future<void> _pickAmount(BuildContext context) async {
-    final controller = TextEditingController(
-      text: '${settings.amountPerReminderMl ?? settings.glassSizeMl}',
-    );
     final result = await showDialog<int>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Amount per reminder'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(suffixText: 'ml'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext)
-                    .pop(int.tryParse(controller.text.trim())),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (_) => _AmountDialog(
+        initialMl: settings.amountPerReminderMl ?? settings.glassSizeMl,
       ),
     );
-    controller.dispose();
     if (result != null && result > 0) {
       onChanged(settings.copyWith(amountPerReminderMl: result));
     }
+  }
+}
+
+/// Stateful so the controller's lifetime matches the dialog's own. Disposing a
+/// controller right after `showDialog` returns leaves the still-animating
+/// TextField rebuilding against a dead controller, which throws while the route
+/// is being torn down.
+class _AmountDialog extends StatefulWidget {
+  const _AmountDialog({required this.initialMl});
+
+  final int initialMl;
+
+  @override
+  State<_AmountDialog> createState() => _AmountDialogState();
+}
+
+class _AmountDialogState extends State<_AmountDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: '${widget.initialMl}',
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    Navigator.of(context).pop(int.tryParse(_controller.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Amount per reminder'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(suffixText: 'ml'),
+        onSubmitted: (_) => _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
+      ],
+    );
   }
 }
 

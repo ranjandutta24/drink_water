@@ -322,7 +322,6 @@ Future<void> _openCustomAmountSheet(
   BuildContext context,
   WaterSettings settings,
 ) async {
-  final controller = TextEditingController();
   final state = AppScope.read(context);
 
   final amount = await showModalBottomSheet<int>(
@@ -332,54 +331,79 @@ Future<void> _openCustomAmountSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
-    builder: (sheetContext) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          22,
-          20,
-          22 + MediaQuery.of(sheetContext).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'How much did you drink?',
-              style: Theme.of(sheetContext).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                suffixText: settings.displayUnit.shortLabel,
-              ),
-              onSubmitted: (value) =>
-                  Navigator.of(sheetContext).pop(_parseToMl(value, settings)),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(sheetContext)
-                      .pop(_parseToMl(controller.text, settings)),
-              child: const Text('Log it'),
-            ),
-          ],
-        ),
-      );
-    },
+    builder: (_) => _CustomAmountSheet(settings: settings),
   );
 
-  controller.dispose();
   if (amount == null || amount <= 0) return;
   await state.addWater(amount);
   if (!context.mounted) return;
   _showLoggedSnack(context, amount, settings);
+}
+
+/// The sheet is a StatefulWidget purely so it can own its TextEditingController.
+/// Creating the controller outside and disposing it as soon as the sheet's
+/// future completes is a trap: the sheet is still mounted while it slides away,
+/// so the TextField keeps rebuilding against a disposed controller and the
+/// resulting throw aborts the subtree's teardown ('_dependents.isEmpty').
+class _CustomAmountSheet extends StatefulWidget {
+  const _CustomAmountSheet({required this.settings});
+
+  final WaterSettings settings;
+
+  @override
+  State<_CustomAmountSheet> createState() => _CustomAmountSheetState();
+}
+
+class _CustomAmountSheetState extends State<_CustomAmountSheet> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit(String raw) {
+    Navigator.of(context).pop(_parseToMl(raw, widget.settings));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        22,
+        20,
+        22 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How much did you drink?',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Amount',
+              suffixText: widget.settings.displayUnit.shortLabel,
+            ),
+            onSubmitted: _submit,
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => _submit(_controller.text),
+            child: const Text('Log it'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 int _parseToMl(String raw, WaterSettings settings) {
