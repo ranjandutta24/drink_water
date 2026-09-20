@@ -51,11 +51,12 @@ class Panel extends StatelessWidget {
             ],
           );
 
+    final palette = AppColors.of(context);
     final content = Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.hairline),
+        border: Border.all(color: palette.hairline),
       ),
       child: ClipRRect(borderRadius: BorderRadius.circular(17), child: body),
     );
@@ -113,7 +114,7 @@ class EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
       child: Column(
         children: [
-          Icon(icon, size: 34, color: AppColors.aqua),
+          Icon(icon, size: 34, color: AppColors.of(context).aqua),
           const SizedBox(height: 14),
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
@@ -150,7 +151,7 @@ class StatTile extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.titleLarge
-              ?.copyWith(color: color ?? AppColors.marine),
+              ?.copyWith(color: color ?? AppColors.of(context).ink),
         ),
         const SizedBox(height: 2),
         Text(label, style: Theme.of(context).textTheme.bodySmall),

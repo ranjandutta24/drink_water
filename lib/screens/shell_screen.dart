@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
-import 'backup_screen.dart';
 import 'home_screen.dart';
 import 'medicines_screen.dart';
 import 'reports_screen.dart';
+import 'settings_screen.dart';
 
 /// Four destinations, each a full screen. Kept alive so the reports keep their
 /// selected period while the user checks something else.
@@ -22,7 +22,7 @@ class _ShellScreenState extends State<ShellScreen> with WidgetsBindingObserver {
     HomeScreen(),
     MedicinesScreen(),
     ReportsScreen(),
-    BackupScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -79,9 +79,9 @@ class _ShellScreenState extends State<ShellScreen> with WidgetsBindingObserver {
             label: 'Reports',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_backup_restore_outlined),
-            selectedIcon: Icon(Icons.settings_backup_restore),
-            label: 'Backup',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),

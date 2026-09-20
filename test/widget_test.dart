@@ -5,6 +5,9 @@ import 'package:drink_water/models/water_settings.dart';
 import 'package:drink_water/services/backup_service.dart';
 import 'package:drink_water/services/notification_service.dart';
 import 'package:drink_water/services/report_service.dart';
+import 'package:drink_water/services/storage_service.dart'
+    show themeModeFromName;
+import 'package:drink_water/theme.dart';
 import 'package:drink_water/utils/format.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -271,6 +274,75 @@ void main() {
 
       expect(bundle.medicines.map((m) => m.name).toList(), ['Good']);
       expect(bundle.settings.intervalMinutes, 90);
+    });
+
+    test('carries the theme choice through an export and back', () {
+      final json = BackupService.encode(
+        settings: const WaterSettings(),
+        medicines: const [],
+        waterLog: const [],
+        medicineLog: const [],
+        themeMode: ThemeMode.dark,
+      );
+
+      expect(BackupService.decode(json).themeMode, ThemeMode.dark);
+    });
+
+    test('leaves the theme alone when the backup has no appearance', () {
+      final bundle = BackupService.decode(
+        '{"app":"drink_water","schemaVersion":1,'
+        '"waterSettings":{"intervalMinutes":60}}',
+      );
+
+      expect(bundle.themeMode, isNull);
+    });
+
+    test('ignores an unrecognised theme name', () {
+      final bundle = BackupService.decode(
+        '{"app":"drink_water","schemaVersion":1,'
+        '"appearance":{"themeMode":"sepia"},'
+        '"waterSettings":{"intervalMinutes":60}}',
+      );
+
+      expect(bundle.themeMode, isNull);
+    });
+  });
+
+  group('theme', () {
+    test(
+      'stored names map back to modes, unknown values follow the system',
+      () {
+        expect(themeModeFromName('dark'), ThemeMode.dark);
+        expect(themeModeFromName('light'), ThemeMode.light);
+        expect(themeModeFromName('system'), ThemeMode.system);
+        expect(themeModeFromName(null), ThemeMode.system);
+        expect(themeModeFromName('nonsense'), ThemeMode.system);
+      },
+    );
+
+    test('both themes expose a palette and matching brightness', () {
+      final light = buildLightTheme();
+      final dark = buildDarkTheme();
+
+      expect(light.brightness, Brightness.light);
+      expect(dark.brightness, Brightness.dark);
+      expect(light.extension<AppPalette>(), AppPalette.light);
+      expect(dark.extension<AppPalette>(), AppPalette.dark);
+    });
+
+    test('the dark palette is actually dark and has full token coverage', () {
+      expect(
+        AppPalette.dark.canvas.computeLuminance(),
+        lessThan(AppPalette.light.canvas.computeLuminance()),
+      );
+      expect(
+        AppPalette.dark.ink.computeLuminance(),
+        greaterThan(AppPalette.light.ink.computeLuminance()),
+      );
+      expect(
+        AppPalette.dark.medicinePalette.length,
+        AppPalette.light.medicinePalette.length,
+      );
     });
   });
 }

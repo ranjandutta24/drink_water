@@ -12,16 +12,17 @@ import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 
-/// Export and import the whole configuration as one JSON file.
-/// Nothing leaves the device unless the user picks a destination themselves.
-class BackupScreen extends StatefulWidget {
-  const BackupScreen({super.key});
+/// Appearance, plus export and import of the whole configuration as one JSON
+/// file. Nothing leaves the device unless the user picks a destination
+/// themselves.
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
 
   @override
-  State<BackupScreen> createState() => _BackupScreenState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _BackupScreenState extends State<BackupScreen> {
+class _SettingsScreenState extends State<SettingsScreen> {
   bool _busy = false;
 
   @override
@@ -30,10 +31,17 @@ class _BackupScreenState extends State<BackupScreen> {
     final settings = state.settings;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Backup')),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 36),
         children: [
+          const SectionHeader(title: 'Appearance'),
+          _AppearancePicker(
+            selected: state.themeMode,
+            onSelected: (mode) => AppScope.read(context).setThemeMode(mode),
+          ),
+          const SizedBox(height: 22),
+          const SectionHeader(title: 'Backup'),
           Panel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,8 +167,8 @@ class _BackupScreenState extends State<BackupScreen> {
                 OutlinedButton(
                   onPressed: _busy ? null : _confirmReset,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.clay,
-                    side: const BorderSide(color: AppColors.clay),
+                    foregroundColor: AppColors.of(context).clay,
+                    side: BorderSide(color: AppColors.of(context).clay),
                   ),
                   child: const Text('Erase everything'),
                 ),
@@ -231,7 +239,7 @@ class _BackupScreenState extends State<BackupScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.of(context).panel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -405,7 +413,9 @@ class _BackupScreenState extends State<BackupScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.clay),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(context).clay,
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Erase'),
           ),
@@ -422,5 +432,251 @@ class _BackupScreenState extends State<BackupScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// Three swatch cards rather than a radio list: the point of a theme setting is
+/// to show what you are choosing, so each card is painted in its own palette.
+class _AppearancePicker extends StatelessWidget {
+  const _AppearancePicker({required this.selected, required this.onSelected});
+
+  final ThemeMode selected;
+  final ValueChanged<ThemeMode> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            for (final option in _themeOptions) ...[
+              if (option != _themeOptions.first) const SizedBox(width: 10),
+              Expanded(
+                child: _ThemeCard(
+                  option: option,
+                  selected: selected == option.mode,
+                  onTap: () => onSelected(option.mode),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(Icons.info_outline, size: 15, color: palette.inkSoft),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                selected == ThemeMode.system
+                    ? 'Following your phone, so it switches with your '
+                          'system-wide dark mode.'
+                    : 'Locked to ${selected == ThemeMode.dark ? 'dark' : 'light'}, '
+                          'whatever your phone is set to.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeOption {
+  const _ThemeOption(this.mode, this.label, this.icon, this.preview);
+
+  final ThemeMode mode;
+  final String label;
+  final IconData icon;
+
+  /// Null for "system": that card shows both palettes split down the middle.
+  final AppPalette? preview;
+}
+
+const List<_ThemeOption> _themeOptions = [
+  _ThemeOption(
+    ThemeMode.system,
+    'System',
+    Icons.brightness_auto_outlined,
+    null,
+  ),
+  _ThemeOption(
+    ThemeMode.light,
+    'Light',
+    Icons.light_mode_outlined,
+    AppPalette.light,
+  ),
+  _ThemeOption(
+    ThemeMode.dark,
+    'Dark',
+    Icons.dark_mode_outlined,
+    AppPalette.dark,
+  ),
+];
+
+class _ThemeCard extends StatelessWidget {
+  const _ThemeCard({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _ThemeOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${option.label} theme',
+      // The ink has to live *inside* the decorated box: an InkWell wrapped
+      // around an opaque container paints its ripple underneath it, where
+      // nobody can see it.
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: selected ? palette.aquaWash : palette.panel,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? palette.aqua : palette.hairline,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(17),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+              child: Column(
+                children: [
+                  _Swatch(preview: option.preview),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        selected ? Icons.check_circle : option.icon,
+                        size: 15,
+                        color: selected ? palette.aquaDeep : palette.inkSoft,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          option.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: selected ? palette.aquaDeep : palette.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A miniature of the home screen: ground, panel, and a water bar.
+class _Swatch extends StatelessWidget {
+  const _Swatch({required this.preview});
+
+  final AppPalette? preview;
+
+  @override
+  Widget build(BuildContext context) {
+    final showBoth = preview == null;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        height: 44,
+        child: showBoth
+            ? const Row(
+                children: [
+                  Expanded(
+                    child: _SwatchHalf(
+                      palette: AppPalette.light,
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ),
+                  Expanded(
+                    child: _SwatchHalf(
+                      palette: AppPalette.dark,
+                      alignment: Alignment.centerRight,
+                    ),
+                  ),
+                ],
+              )
+            : _SwatchHalf(palette: preview!, alignment: Alignment.center),
+      ),
+    );
+  }
+}
+
+class _SwatchHalf extends StatelessWidget {
+  const _SwatchHalf({required this.palette, required this.alignment});
+
+  final AppPalette palette;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: palette.canvas,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: palette.panel,
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: palette.hairline, width: 0.6),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: alignment,
+              child: FractionallySizedBox(
+                widthFactor: 0.7,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: palette.aqua,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.hairline,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

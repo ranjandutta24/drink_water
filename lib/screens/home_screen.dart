@@ -118,17 +118,21 @@ class _Greeting extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: AppColors.aquaWash,
+              color: AppColors.of(context).aquaWash,
               borderRadius: BorderRadius.circular(999),
             ),
             child: Row(
               children: [
-                const Icon(Icons.bolt, size: 16, color: AppColors.aquaDeep),
+                Icon(
+                  Icons.bolt,
+                  size: 16,
+                  color: AppColors.of(context).aquaDeep,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '$streak day${streak == 1 ? '' : 's'} on goal',
-                  style: const TextStyle(
-                    color: AppColors.aquaDeep,
+                  style: TextStyle(
+                    color: AppColors.of(context).aquaDeep,
                     fontWeight: FontWeight.w600,
                     fontSize: 12.5,
                   ),
@@ -160,7 +164,9 @@ class _NextReminderLine extends StatelessWidget {
             settings.remindersEnabled
                 ? Icons.notifications_active_outlined
                 : Icons.notifications_off_outlined,
-            color: settings.remindersEnabled ? AppColors.aqua : AppColors.slate,
+            color: settings.remindersEnabled
+                ? AppColors.of(context).aqua
+                : AppColors.of(context).inkSoft,
             size: 20,
           ),
           const SizedBox(width: 12),
@@ -180,7 +186,11 @@ class _NextReminderLine extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           const SizedBox(width: 6),
-          const Icon(Icons.chevron_right, size: 20, color: AppColors.slate),
+          Icon(
+            Icons.chevron_right,
+            size: 20,
+            color: AppColors.of(context).inkSoft,
+          ),
         ],
       ),
     );
@@ -242,7 +252,9 @@ class _AmountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: emphasised ? AppColors.aqua : Colors.white,
+      color: emphasised
+          ? AppColors.of(context).aqua
+          : AppColors.of(context).panel,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -256,7 +268,9 @@ class _AmountButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: emphasised ? AppColors.aqua : AppColors.hairline,
+              color: emphasised
+                  ? AppColors.of(context).aqua
+                  : AppColors.of(context).hairline,
             ),
           ),
           child: Column(
@@ -265,7 +279,9 @@ class _AmountButton extends StatelessWidget {
               Icon(
                 Icons.add,
                 size: 16,
-                color: emphasised ? Colors.white : AppColors.aqua,
+                color: emphasised
+                    ? AppColors.of(context).onAccent
+                    : AppColors.of(context).aqua,
               ),
               const SizedBox(height: 2),
               Text(
@@ -273,7 +289,9 @@ class _AmountButton extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13.5,
-                  color: emphasised ? Colors.white : AppColors.marine,
+                  color: emphasised
+                      ? AppColors.of(context).onAccent
+                      : AppColors.of(context).ink,
                 ),
               ),
             ],
@@ -310,7 +328,7 @@ Future<void> _openCustomAmountSheet(
   final amount = await showModalBottomSheet<int>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.of(context).panel,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
@@ -384,7 +402,8 @@ void _showLoggedSnack(
       duration: const Duration(seconds: 3),
       action: SnackBarAction(
         label: 'Undo',
-        textColor: Colors.white,
+        // Matches the snack bar's own text colour, which flips with the theme.
+        textColor: Theme.of(context).snackBarTheme.contentTextStyle?.color,
         onPressed: state.undoLastEntry,
       ),
     ),
@@ -411,18 +430,21 @@ class _TodayLog extends StatelessWidget {
               key: ValueKey(entries[i].id),
               direction: DismissDirection.endToStart,
               background: Container(
-                color: AppColors.clay,
+                color: AppColors.of(context).clay,
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 20),
-                child: const Icon(Icons.delete_outline, color: Colors.white),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: AppColors.of(context).onAccent,
+                ),
               ),
               onDismissed: (_) => state.removeWaterEntry(entries[i].id),
               child: ListTile(
                 leading: Container(
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
-                    color: AppColors.aquaWash,
+                  decoration: BoxDecoration(
+                    color: AppColors.of(context).aquaWash,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -430,7 +452,7 @@ class _TodayLog extends StatelessWidget {
                         ? Icons.notifications_outlined
                         : Icons.water_drop,
                     size: 18,
-                    color: AppColors.aquaDeep,
+                    color: AppColors.of(context).aquaDeep,
                   ),
                 ),
                 title: Text(

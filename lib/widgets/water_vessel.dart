@@ -100,7 +100,26 @@ class _WaterVesselState extends State<WaterVessel>
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final theme = Theme.of(context);
+    final palette = AppColors.of(context);
     final overflowing = widget.progress > 1.0;
+
+    // The painter has no BuildContext, so the themed colours are resolved here
+    // and handed over. Highlights are pulled back on dark, where the same white
+    // sheen over a darker body would read as glare.
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = overflowing ? palette.kelp : palette.aqua;
+    final skin = _VesselSkin(
+      glass: palette.vesselGlass,
+      waterTop: Color.lerp(accent, Colors.white, isDark ? 0.10 : 0.22)!,
+      waterBottom: Color.lerp(accent, Colors.black, isDark ? 0.34 : 0.26)!,
+      sheen: Colors.white.withValues(alpha: isDark ? 0.16 : 0.35),
+      sheenBright: Colors.white.withValues(alpha: isDark ? 0.28 : 0.55),
+      bubble: Colors.white.withValues(alpha: isDark ? 0.18 : 0.30),
+      tick: palette.aquaDeep.withValues(alpha: isDark ? 0.34 : 0.28),
+      outline: overflowing
+          ? palette.kelp.withValues(alpha: 0.9)
+          : palette.aquaDeep.withValues(alpha: isDark ? 0.75 : 0.65),
+    );
 
     return SizedBox(
       width: widget.size.width,
@@ -121,7 +140,7 @@ class _WaterVesselState extends State<WaterVessel>
                   Text(
                     widget.primaryLabel,
                     style: theme.textTheme.displayMedium?.copyWith(
-                      color: AppColors.marine,
+                      color: palette.aquaDeep,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -129,7 +148,7 @@ class _WaterVesselState extends State<WaterVessel>
                     widget.secondaryLabel,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.aquaDeep,
+                      color: palette.aqua,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -146,6 +165,7 @@ class _WaterVesselState extends State<WaterVessel>
                 phase: reduceMotion ? 0 : _waves.value * 2 * math.pi,
                 animateWaves: !reduceMotion,
                 overflowing: overflowing,
+                skin: skin,
               ),
               child: child,
             ),
@@ -156,28 +176,76 @@ class _WaterVesselState extends State<WaterVessel>
   }
 }
 
+/// The themed colours the painter needs, resolved from [AppPalette] by the
+/// widget above it — a CustomPainter has no BuildContext of its own.
+@immutable
+class _VesselSkin {
+  const _VesselSkin({
+    required this.glass,
+    required this.waterTop,
+    required this.waterBottom,
+    required this.sheen,
+    required this.sheenBright,
+    required this.bubble,
+    required this.tick,
+    required this.outline,
+  });
+
+  final Color glass;
+  final Color waterTop;
+  final Color waterBottom;
+  final Color sheen;
+  final Color sheenBright;
+  final Color bubble;
+  final Color tick;
+  final Color outline;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _VesselSkin &&
+      other.glass == glass &&
+      other.waterTop == waterTop &&
+      other.waterBottom == waterBottom &&
+      other.sheen == sheen &&
+      other.sheenBright == sheenBright &&
+      other.bubble == bubble &&
+      other.tick == tick &&
+      other.outline == outline;
+
+  @override
+  int get hashCode => Object.hash(
+    glass,
+    waterTop,
+    waterBottom,
+    sheen,
+    sheenBright,
+    bubble,
+    tick,
+    outline,
+  );
+}
+
 class _VesselPainter extends CustomPainter {
   _VesselPainter({
     required this.level,
     required this.phase,
     required this.animateWaves,
     required this.overflowing,
+    required this.skin,
   });
 
   final double level;
   final double phase;
   final bool animateWaves;
   final bool overflowing;
+  final _VesselSkin skin;
 
   @override
   void paint(Canvas canvas, Size size) {
     final body = _vesselPath(size);
 
     // Glass
-    canvas.drawPath(
-      body,
-      Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.92),
-    );
+    canvas.drawPath(body, Paint()..color = skin.glass.withValues(alpha: 0.92));
 
     canvas.save();
     canvas.clipPath(body);
@@ -192,9 +260,7 @@ class _VesselPainter extends CustomPainter {
           ..shader = LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: overflowing
-                ? const [Color(0xFF3FBF9B), AppColors.kelp]
-                : const [Color(0xFF52C4D3), AppColors.aquaDeep],
+            colors: [skin.waterTop, skin.waterBottom],
           ).createShader(waterRect),
       );
 
@@ -205,7 +271,7 @@ class _VesselPainter extends CustomPainter {
         waterTop,
         amplitude: 6,
         phase: phase,
-        color: Colors.white.withValues(alpha: 0.35),
+        color: skin.sheen,
       );
       _drawWave(
         canvas,
@@ -213,13 +279,12 @@ class _VesselPainter extends CustomPainter {
         waterTop,
         amplitude: 4,
         phase: phase + math.pi / 1.6,
-        color: Colors.white.withValues(alpha: 0.55),
+        color: skin.sheenBright,
       );
 
       // Rising bubbles, only while animating.
       if (animateWaves) {
-        final bubblePaint = Paint()
-          ..color = Colors.white.withValues(alpha: 0.30);
+        final bubblePaint = Paint()..color = skin.bubble;
         for (var i = 0; i < 6; i++) {
           final seed = (i + 1) * 0.137;
           final travel = ((phase / (2 * math.pi)) + seed) % 1.0;
@@ -236,7 +301,7 @@ class _VesselPainter extends CustomPainter {
 
     // Measurement ticks at 25 / 50 / 75 %, so the vessel doubles as a gauge.
     final tickPaint = Paint()
-      ..color = AppColors.aquaDeep.withValues(alpha: 0.28)
+      ..color = skin.tick
       ..strokeWidth = 1;
     for (final fraction in const [0.25, 0.5, 0.75]) {
       final y = size.height * (1 - fraction);
@@ -253,9 +318,7 @@ class _VesselPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
-        ..color = overflowing
-            ? AppColors.kelp.withValues(alpha: 0.9)
-            : AppColors.aquaDeep.withValues(alpha: 0.65),
+        ..color = skin.outline,
     );
   }
 
@@ -328,5 +391,6 @@ class _VesselPainter extends CustomPainter {
   bool shouldRepaint(_VesselPainter oldDelegate) =>
       oldDelegate.level != level ||
       oldDelegate.phase != phase ||
-      oldDelegate.overflowing != overflowing;
+      oldDelegate.overflowing != overflowing ||
+      oldDelegate.skin != skin;
 }

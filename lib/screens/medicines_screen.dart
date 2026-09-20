@@ -132,8 +132,8 @@ class _TodayDoses extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                     color: doses[i].time.minutesOfDay < now
-                        ? AppColors.slate
-                        : AppColors.marine,
+                        ? AppColors.of(context).inkSoft
+                        : AppColors.of(context).ink,
                   ),
                 ),
               ),
@@ -148,7 +148,7 @@ class _TodayDoses extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
               trailing: state.takenToday(doses[i].medicine.id)
-                  ? const Icon(Icons.check_circle, color: AppColors.kelp)
+                  ? Icon(Icons.check_circle, color: AppColors.of(context).kelp)
                   : TextButton(
                       onPressed: () async {
                         await state.recordMedicineTaken(doses[i].medicine.id);
@@ -181,11 +181,11 @@ class _MedicineCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.read(context);
     final accent =
-        AppColors.medicinePalette[medicine.colorIndex %
-            AppColors.medicinePalette.length];
+        AppColors.of(context).medicinePalette[medicine.colorIndex %
+            AppColors.of(context).medicinePalette.length];
 
     return Panel(
-      accent: medicine.enabled ? accent : AppColors.hairline,
+      accent: medicine.enabled ? accent : AppColors.of(context).hairline,
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
@@ -205,8 +205,8 @@ class _MedicineCard extends StatelessWidget {
                       medicine.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: medicine.enabled
-                            ? AppColors.marine
-                            : AppColors.slate,
+                            ? AppColors.of(context).ink
+                            : AppColors.of(context).inkSoft,
                       ),
                     ),
                     if (medicine.dosage.trim().isNotEmpty ||
@@ -243,7 +243,7 @@ class _MedicineCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: medicine.enabled
                         ? accent.withValues(alpha: 0.10)
-                        : const Color(0xFFF2F4F5),
+                        : AppColors.of(context).canvas,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -251,7 +251,9 @@ class _MedicineCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: medicine.enabled ? accent : AppColors.slate,
+                      color: medicine.enabled
+                          ? accent
+                          : AppColors.of(context).inkSoft,
                     ),
                   ),
                 ),
@@ -260,10 +262,10 @@ class _MedicineCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.calendar_today_outlined,
                 size: 14,
-                color: AppColors.slate,
+                color: AppColors.of(context).inkSoft,
               ),
               const SizedBox(width: 6),
               Text(

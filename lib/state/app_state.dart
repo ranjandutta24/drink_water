@@ -20,8 +20,10 @@ class AppState extends ChangeNotifier {
   List<Medicine> _medicines = const [];
   List<WaterEntry> _waterLog = const [];
   List<MedicineIntake> _medicineLog = const [];
+  ThemeMode _themeMode = ThemeMode.system;
 
   WaterSettings get settings => _settings;
+  ThemeMode get themeMode => _themeMode;
   List<Medicine> get medicines => List.unmodifiable(_medicines);
   List<WaterEntry> get waterLog => List.unmodifiable(_waterLog);
   List<MedicineIntake> get medicineLog => List.unmodifiable(_medicineLog);
@@ -41,6 +43,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _load() async {
+    _themeMode = _storage.loadThemeMode();
     _settings = _storage.loadSettings();
     _medicines = _storage.loadMedicines();
     _waterLog = _pruneOldEntries(_storage.loadWaterLog());
@@ -75,6 +78,15 @@ class AppState extends ChangeNotifier {
         entries.where((entry) => entry.timestamp.isAfter(cutoff)).toList()
           ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return kept;
+  }
+
+  // --- Appearance -----------------------------------------------------------
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (mode == _themeMode) return;
+    _themeMode = mode;
+    notifyListeners();
+    await _storage.saveThemeMode(mode);
   }
 
   // --- Water settings -------------------------------------------------------
@@ -188,6 +200,7 @@ class AppState extends ChangeNotifier {
     medicines: _medicines,
     waterLog: _waterLog,
     medicineLog: _medicineLog,
+    themeMode: _themeMode,
   );
 
   /// [merge] keeps existing data and adds anything new; otherwise the backup
@@ -230,8 +243,11 @@ class AppState extends ChangeNotifier {
     }
 
     _settings = bundle.settings;
+    final restoredTheme = bundle.themeMode;
+    if (restoredTheme != null) _themeMode = restoredTheme;
     notifyListeners();
 
+    if (restoredTheme != null) await _storage.saveThemeMode(restoredTheme);
     await _storage.saveSettings(_settings);
     await _storage.saveMedicines(_medicines);
     await _storage.saveWaterLog(_waterLog);

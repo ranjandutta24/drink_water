@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart' show ThemeMode;
+
 import '../models/medicine.dart';
 import '../models/water_log.dart';
 import '../models/water_settings.dart';
@@ -13,7 +15,12 @@ class BackupBundle {
     required this.medicineLog,
     required this.exportedAt,
     required this.schemaVersion,
+    this.themeMode,
   });
+
+  /// Null when the file predates the appearance setting — in that case the
+  /// current theme is left alone rather than reset to "system".
+  final ThemeMode? themeMode;
 
   final WaterSettings settings;
   final List<Medicine> medicines;
@@ -51,11 +58,15 @@ class BackupService {
     required List<Medicine> medicines,
     required List<WaterEntry> waterLog,
     required List<MedicineIntake> medicineLog,
+    ThemeMode themeMode = ThemeMode.system,
   }) {
     final payload = <String, dynamic>{
       'app': _appId,
       'schemaVersion': schemaVersion,
       'exportedAt': DateTime.now().toIso8601String(),
+      // Additive, so the version stays at 1: older builds ignore the key and
+      // newer ones treat its absence as "leave the theme as it is".
+      'appearance': <String, dynamic>{'themeMode': themeMode.name},
       'waterSettings': settings.toJson(),
       'medicines': medicines.map((medicine) => medicine.toJson()).toList(),
       'waterLog': waterLog.map((entry) => entry.toJson()).toList(),
@@ -146,7 +157,20 @@ class BackupService {
       medicineLog: medicineLog,
       exportedAt: DateTime.tryParse('${decoded['exportedAt']}'),
       schemaVersion: version,
+      themeMode: _readThemeMode(decoded['appearance']),
     );
+  }
+
+  /// Returns null for anything unrecognised so a malformed or missing value
+  /// simply leaves the user's current theme untouched.
+  static ThemeMode? _readThemeMode(Object? appearance) {
+    if (appearance is! Map) return null;
+    final name = appearance['themeMode'];
+    if (name is! String) return null;
+    for (final mode in ThemeMode.values) {
+      if (mode.name == name) return mode;
+    }
+    return null;
   }
 
   static String suggestedFileName([DateTime? now]) {

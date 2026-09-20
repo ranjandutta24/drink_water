@@ -106,7 +106,7 @@ class _IntervalPanel extends StatelessWidget {
             min: 15,
             max: 240,
             divisions: 45,
-            activeColor: AppColors.aqua,
+            activeColor: AppColors.of(context).aqua,
             label: formatInterval(settings.intervalMinutes),
             onChanged: (value) {
               // Snap to 5 minute steps — nobody needs a 37 minute interval.
@@ -124,15 +124,15 @@ class _IntervalPanel extends StatelessWidget {
                   label: Text(formatInterval(minutes)),
                   selected: settings.intervalMinutes == minutes,
                   showCheckmark: false,
-                  selectedColor: AppColors.aqua,
-                  side: const BorderSide(color: AppColors.hairline),
-                  backgroundColor: Colors.white,
+                  selectedColor: AppColors.of(context).aqua,
+                  side: BorderSide(color: AppColors.of(context).hairline),
+                  backgroundColor: AppColors.of(context).panel,
                   labelStyle: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                     color: settings.intervalMinutes == minutes
-                        ? Colors.white
-                        : AppColors.marine,
+                        ? AppColors.of(context).onAccent
+                        : AppColors.of(context).ink,
                   ),
                   onSelected: (_) =>
                       onChanged(settings.copyWith(intervalMinutes: minutes)),
@@ -206,7 +206,7 @@ class _TimeRow extends StatelessWidget {
       trailing: Text(
         formatTime(time, use24h: use24h),
         style: Theme.of(context).textTheme.titleMedium
-            ?.copyWith(color: AppColors.aquaDeep),
+            ?.copyWith(color: AppColors.of(context).aquaDeep),
       ),
       onTap: () async {
         final picked = await showTimePicker(
@@ -244,10 +244,10 @@ class _UnitsPanel extends StatelessWidget {
             selected: {settings.displayUnit},
             showSelectedIcon: false,
             style: SegmentedButton.styleFrom(
-              backgroundColor: Colors.white,
-              selectedBackgroundColor: AppColors.aquaWash,
-              selectedForegroundColor: AppColors.aquaDeep,
-              side: const BorderSide(color: AppColors.hairline),
+              backgroundColor: AppColors.of(context).panel,
+              selectedBackgroundColor: AppColors.of(context).aquaWash,
+              selectedForegroundColor: AppColors.of(context).aquaDeep,
+              side: BorderSide(color: AppColors.of(context).hairline),
             ),
             onSelectionChanged: (selection) =>
                 onChanged(settings.copyWith(displayUnit: selection.first)),
@@ -621,7 +621,7 @@ class _PermissionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFFDF4E7),
+      color: AppColors.of(context).noticeWash,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,10 +629,10 @@ class _PermissionRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline,
                 size: 18,
-                color: Color(0xFFB5892B),
+                color: AppColors.of(context).noticeInk,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -684,15 +684,15 @@ class _SchedulePreview extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.aquaWash,
+                    color: AppColors.of(context).aquaWash,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     slot.label(settings.use24hClock),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.aquaDeep,
+                      color: AppColors.of(context).aquaDeep,
                     ),
                   ),
                 ),

@@ -1,10 +1,25 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/medicine.dart';
 import '../models/water_log.dart';
 import '../models/water_settings.dart';
+
+/// Tolerant parse of a stored or imported theme-mode name. Anything unknown —
+/// including null, from an older backup that predates the setting — means
+/// "follow the system".
+ThemeMode themeModeFromName(String? name) {
+  switch (name) {
+    case 'light':
+      return ThemeMode.light;
+    case 'dark':
+      return ThemeMode.dark;
+    default:
+      return ThemeMode.system;
+  }
+}
 
 /// Everything lives on the device in SharedPreferences as JSON strings.
 /// There is deliberately no network layer anywhere in this app.
@@ -15,6 +30,7 @@ class StorageService {
   static const _kMedicines = 'medicines_v1';
   static const _kWaterLog = 'water_log_v1';
   static const _kMedicineLog = 'medicine_log_v1';
+  static const _kThemeMode = 'theme_mode_v1';
 
   final SharedPreferences _prefs;
 
@@ -35,8 +51,9 @@ class StorageService {
     if (raw == null || raw.isEmpty) return const WaterSettings();
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>)
+      if (decoded is Map<String, dynamic>) {
         return WaterSettings.fromJson(decoded);
+      }
     } catch (_) {
       // Corrupt payload: fall back to defaults rather than crash on launch.
     }
@@ -45,6 +62,15 @@ class StorageService {
 
   Future<void> saveSettings(WaterSettings settings) =>
       _prefs.setString(_kWaterSettings, jsonEncode(settings.toJson()));
+
+  // --- Appearance -----------------------------------------------------------
+
+  /// Stored as a name rather than an index so the value survives any future
+  /// reordering of [ThemeMode].
+  ThemeMode loadThemeMode() => themeModeFromName(_prefs.getString(_kThemeMode));
+
+  Future<void> saveThemeMode(ThemeMode mode) =>
+      _prefs.setString(_kThemeMode, mode.name);
 
   // --- Medicines ------------------------------------------------------------
 
@@ -91,6 +117,8 @@ class StorageService {
     await _prefs.remove(_kMedicines);
     await _prefs.remove(_kWaterLog);
     await _prefs.remove(_kMedicineLog);
+    // The theme choice is a preference, not data: erasing the log should not
+    // throw the user back into a theme they did not pick.
   }
 
   // --- helpers --------------------------------------------------------------

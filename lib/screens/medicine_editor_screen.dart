@@ -138,15 +138,17 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
                           label: Text(relation.label),
                           selected: _mealRelation == relation,
                           showCheckmark: false,
-                          backgroundColor: Colors.white,
-                          selectedColor: AppColors.irisWash,
-                          side: const BorderSide(color: AppColors.hairline),
+                          backgroundColor: AppColors.of(context).panel,
+                          selectedColor: AppColors.of(context).irisWash,
+                          side: BorderSide(
+                            color: AppColors.of(context).hairline,
+                          ),
                           labelStyle: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: _mealRelation == relation
-                                ? AppColors.iris
-                                : AppColors.marine,
+                                ? AppColors.of(context).iris
+                                : AppColors.of(context).ink,
                           ),
                           onSelected: (_) =>
                               setState(() => _mealRelation = relation),
@@ -170,7 +172,7 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
                     children: [
                       for (
                         var i = 0;
-                        i < AppColors.medicinePalette.length;
+                        i < AppColors.of(context).medicinePalette.length;
                         i++
                       ) ...[
                         if (i > 0) const SizedBox(width: 10),
@@ -180,11 +182,11 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
                             width: 34,
                             height: 34,
                             decoration: BoxDecoration(
-                              color: AppColors.medicinePalette[i],
+                              color: AppColors.of(context).medicinePalette[i],
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: _colorIndex == i
-                                    ? AppColors.marine
+                                    ? AppColors.of(context).ink
                                     : Colors.transparent,
                                 width: 2.5,
                               ),
@@ -284,7 +286,9 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
             child: const Text('Keep it'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.clay),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(context).clay,
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Delete'),
           ),
@@ -343,11 +347,11 @@ class _TimesPanel extends StatelessWidget {
             const Divider(height: 1),
           ],
           ListTile(
-            leading: const Icon(Icons.add, color: AppColors.iris),
-            title: const Text(
+            leading: Icon(Icons.add, color: AppColors.of(context).iris),
+            title: Text(
               'Add a time',
               style: TextStyle(
-                color: AppColors.iris,
+                color: AppColors.of(context).iris,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -402,13 +406,13 @@ class _WeekdayPanel extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: selected.contains(day)
-                            ? AppColors.iris
-                            : Colors.white,
+                            ? AppColors.of(context).iris
+                            : AppColors.of(context).panel,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: selected.contains(day)
-                              ? AppColors.iris
-                              : AppColors.hairline,
+                              ? AppColors.of(context).iris
+                              : AppColors.of(context).hairline,
                         ),
                       ),
                       child: Text(
@@ -416,8 +420,8 @@ class _WeekdayPanel extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           color: selected.contains(day)
-                              ? Colors.white
-                              : AppColors.slate,
+                              ? AppColors.of(context).onAccent
+                              : AppColors.of(context).inkSoft,
                         ),
                       ),
                     ),
@@ -461,12 +465,12 @@ class _SummaryLine extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.irisWash,
+        color: AppColors.of(context).irisWash,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 18, color: AppColors.iris),
+          Icon(Icons.info_outline, size: 18, color: AppColors.of(context).iris),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -474,7 +478,7 @@ class _SummaryLine extends StatelessWidget {
                   ? 'Pick at least one day and one time.'
                   : 'That is $total reminder${total == 1 ? '' : 's'} a week.',
               style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: AppColors.marine),
+                  ?.copyWith(color: AppColors.of(context).ink),
             ),
           ),
         ],

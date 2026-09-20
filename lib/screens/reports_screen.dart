@@ -48,10 +48,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
             selected: {_range},
             showSelectedIcon: false,
             style: SegmentedButton.styleFrom(
-              backgroundColor: Colors.white,
-              selectedBackgroundColor: AppColors.aquaWash,
-              selectedForegroundColor: AppColors.aquaDeep,
-              side: const BorderSide(color: AppColors.hairline),
+              backgroundColor: AppColors.of(context).panel,
+              selectedBackgroundColor: AppColors.of(context).aquaWash,
+              selectedForegroundColor: AppColors.of(context).aquaDeep,
+              side: BorderSide(color: AppColors.of(context).hairline),
             ),
             onSelectionChanged: (selection) => setState(() {
               _range = selection.first;
@@ -192,8 +192,8 @@ class _SummaryPanel extends StatelessWidget {
                   value: '${report.goalsMet}/${report.daysElapsed}',
                   label: 'days on goal',
                   color: report.goalsMet > 0
-                      ? AppColors.kelp
-                      : AppColors.marine,
+                      ? AppColors.of(context).kelp
+                      : AppColors.of(context).ink,
                 ),
               ),
             ],
@@ -204,8 +204,8 @@ class _SummaryPanel extends StatelessWidget {
             child: LinearProgressIndicator(
               value: report.goalHitRate.clamp(0.0, 1.0),
               minHeight: 8,
-              backgroundColor: AppColors.aquaWash,
-              valueColor: const AlwaysStoppedAnimation(AppColors.kelp),
+              backgroundColor: AppColors.of(context).aquaWash,
+              valueColor: AlwaysStoppedAnimation(AppColors.of(context).kelp),
             ),
           ),
           const SizedBox(height: 8),
@@ -237,13 +237,13 @@ class _WeekBars extends StatelessWidget {
         alignment: BarChartAlignment.spaceAround,
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
-            getTooltipColor: (_) => AppColors.marine,
+            getTooltipColor: (_) => AppColors.of(context).ink,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               final day = report.days[group.x];
               return BarTooltipItem(
                 '${formatDayLabel(day.date)}\n'
                 '${formatVolume(day.totalMl, settings)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
+                TextStyle(color: AppColors.of(context).panel, fontSize: 12),
               );
             },
           ),
@@ -253,7 +253,7 @@ class _WeekBars extends StatelessWidget {
           drawVerticalLine: false,
           horizontalInterval: maxValue / 3,
           getDrawingHorizontalLine: (_) =>
-              const FlLine(color: AppColors.hairline, strokeWidth: 1),
+              FlLine(color: AppColors.of(context).hairline, strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
@@ -280,7 +280,9 @@ class _WeekBars extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                      color: isToday ? AppColors.aquaDeep : AppColors.slate,
+                      color: isToday
+                          ? AppColors.of(context).aquaDeep
+                          : AppColors.of(context).inkSoft,
                     ),
                   ),
                 );
@@ -292,7 +294,7 @@ class _WeekBars extends StatelessWidget {
           horizontalLines: [
             HorizontalLine(
               y: settings.dailyGoalMl.toDouble(),
-              color: AppColors.kelp.withValues(alpha: 0.7),
+              color: AppColors.of(context).kelp.withValues(alpha: 0.7),
               strokeWidth: 1.4,
               dashArray: const [5, 4],
             ),
@@ -310,12 +312,12 @@ class _WeekBars extends StatelessWidget {
                     top: Radius.circular(6),
                   ),
                   color: report.days[i].goalMet
-                      ? AppColors.kelp
-                      : AppColors.aqua,
+                      ? AppColors.of(context).kelp
+                      : AppColors.of(context).aqua,
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
                     toY: maxValue,
-                    color: AppColors.mist,
+                    color: AppColors.of(context).canvas,
                   ),
                 ),
               ],
@@ -342,13 +344,13 @@ class _MonthBars extends StatelessWidget {
         alignment: BarChartAlignment.spaceBetween,
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
-            getTooltipColor: (_) => AppColors.marine,
+            getTooltipColor: (_) => AppColors.of(context).ink,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               final day = report.days[group.x];
               return BarTooltipItem(
                 '${day.date.day} ${monthShort(day.date)}\n'
                 '${formatVolume(day.totalMl, settings)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
+                TextStyle(color: AppColors.of(context).panel, fontSize: 12),
               );
             },
           ),
@@ -358,7 +360,7 @@ class _MonthBars extends StatelessWidget {
           drawVerticalLine: false,
           horizontalInterval: maxValue / 3,
           getDrawingHorizontalLine: (_) =>
-              const FlLine(color: AppColors.hairline, strokeWidth: 1),
+              FlLine(color: AppColors.of(context).hairline, strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
@@ -382,9 +384,9 @@ class _MonthBars extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     '$dayNumber',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.slate,
+                      color: AppColors.of(context).inkSoft,
                     ),
                   ),
                 );
@@ -396,7 +398,7 @@ class _MonthBars extends StatelessWidget {
           horizontalLines: [
             HorizontalLine(
               y: settings.dailyGoalMl.toDouble(),
-              color: AppColors.kelp.withValues(alpha: 0.7),
+              color: AppColors.of(context).kelp.withValues(alpha: 0.7),
               strokeWidth: 1.4,
               dashArray: const [5, 4],
             ),
@@ -414,8 +416,8 @@ class _MonthBars extends StatelessWidget {
                     top: Radius.circular(3),
                   ),
                   color: report.days[i].goalMet
-                      ? AppColors.kelp
-                      : AppColors.aqua,
+                      ? AppColors.of(context).kelp
+                      : AppColors.of(context).aqua,
                 ),
               ],
             ),
@@ -454,7 +456,7 @@ class _StreakPanel extends StatelessWidget {
             child: StatTile(
               value: '${service.currentStreak}',
               label: 'day streak now',
-              color: AppColors.aquaDeep,
+              color: AppColors.of(context).aquaDeep,
             ),
           ),
           Expanded(
@@ -492,7 +494,7 @@ class _ExtremesPanel extends StatelessWidget {
       child: Column(
         children: [
           ListTile(
-            leading: const Icon(Icons.trending_up, color: AppColors.kelp),
+            leading: Icon(Icons.trending_up, color: AppColors.of(context).kelp),
             title: Text('Best day: ${formatDayLabel(best.date)}'),
             trailing: Text(
               formatVolume(best.totalMl, settings),
@@ -502,7 +504,10 @@ class _ExtremesPanel extends StatelessWidget {
           if (worst != null && worst.date != best.date) ...[
             const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.trending_down, color: AppColors.clay),
+              leading: Icon(
+                Icons.trending_down,
+                color: AppColors.of(context).clay,
+              ),
               title: Text('Lightest day: ${formatDayLabel(worst.date)}'),
               trailing: Text(
                 formatVolume(worst.totalMl, settings),
@@ -557,14 +562,16 @@ class _MedicinePanel extends StatelessWidget {
                 child: StatTile(
                   value: '$taken',
                   label: 'doses taken',
-                  color: AppColors.kelp,
+                  color: AppColors.of(context).kelp,
                 ),
               ),
               Expanded(
                 child: StatTile(
                   value: '$skipped',
                   label: 'doses skipped',
-                  color: skipped > 0 ? AppColors.clay : AppColors.marine,
+                  color: skipped > 0
+                      ? AppColors.of(context).clay
+                      : AppColors.of(context).ink,
                 ),
               ),
             ],

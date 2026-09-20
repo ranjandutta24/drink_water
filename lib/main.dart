@@ -5,6 +5,12 @@ import 'services/notification_service.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
+/// Built once. _Frame rebuilds on every state change (it listens for theme-mode
+/// changes), and each ThemeData involves a seeded ColorScheme plus a dozen
+/// sub-themes — not something to redo every time a drink is logged.
+final ThemeData _lightTheme = buildLightTheme();
+final ThemeData _darkTheme = buildDarkTheme();
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const DrinkWaterApp());
@@ -50,10 +56,17 @@ class _DrinkWaterAppState extends State<DrinkWaterApp> {
         if (state == null) return const _Frame(child: _Splash());
 
         // AppScope sits *above* MaterialApp so the Navigator — and therefore
-        // every pushed route — is a descendant of it.
+        // every pushed route — is a descendant of it. The nested builder is
+        // what lets a theme change rebuild the MaterialApp: it subscribes to
+        // the state from *below* the scope.
         return AppScope(
           state: state,
-          child: const _Frame(child: ShellScreen()),
+          child: Builder(
+            builder: (context) => _Frame(
+              themeMode: AppScope.of(context).themeMode,
+              child: const ShellScreen(),
+            ),
+          ),
         );
       },
     );
@@ -63,16 +76,19 @@ class _DrinkWaterAppState extends State<DrinkWaterApp> {
 /// The MaterialApp itself. Split out so it can be reused for every startup
 /// state without duplicating the theme.
 class _Frame extends StatelessWidget {
-  const _Frame({required this.child});
+  const _Frame({required this.child, this.themeMode = ThemeMode.system});
 
   final Widget child;
+  final ThemeMode themeMode;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Drink Water',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
+      theme: _lightTheme,
+      darkTheme: _darkTheme,
+      themeMode: themeMode,
       home: child,
     );
   }
@@ -83,14 +99,14 @@ class _Splash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: SizedBox(
           width: 28,
           height: 28,
           child: CircularProgressIndicator(
             strokeWidth: 2.5,
-            color: AppColors.aqua,
+            color: AppColors.of(context).aqua,
           ),
         ),
       ),
@@ -112,7 +128,11 @@ class _StartupError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 34, color: AppColors.clay),
+              Icon(
+                Icons.error_outline,
+                size: 34,
+                color: AppColors.of(context).clay,
+              ),
               const SizedBox(height: 14),
               Text(
                 'The app could not load your data',
