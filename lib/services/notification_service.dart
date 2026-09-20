@@ -148,8 +148,12 @@ class NotificationService {
 
   Future<void> _configureLocalTimeZone() async {
     try {
-      final info = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(info.identifier));
+      // flutter_timezone changed this return type between major versions: older
+      // releases hand back a plain String, newer ones a TimezoneInfo. Reading it
+      // dynamically keeps this working either way.
+      final dynamic info = await FlutterTimezone.getLocalTimezone();
+      final name = info is String ? info : '${info.identifier}';
+      tz.setLocalLocation(tz.getLocation(name));
     } catch (error) {
       // Falls back to UTC. Scheduling still works, just without DST awareness.
       debugPrint('Could not resolve local time zone: $error');
