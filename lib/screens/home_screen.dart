@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/volume_unit.dart';
@@ -70,7 +72,9 @@ class HomeScreen extends StatelessWidget {
               const EmptyState(
                 icon: Icons.water_drop_outlined,
                 title: 'Nothing logged yet',
-                message: 'Tap an amount above to record your first drink of the day.',
+                message:
+                    'Tap an amount above, then tap it again to confirm your '
+                    'first drink of the day.',
               )
             else
               _TodayLog(entries: todayEntries, settings: settings),
@@ -212,27 +216,140 @@ class _NextReminderLine extends StatelessWidget {
   }
 }
 
-class _QuickAddRow extends StatelessWidget {
+/// Quick-add is deliberately two-tap: the first tap arms one button, the second
+/// commits it. A phone in a pocket or a mis-aimed thumb can produce one tap, but
+/// almost never two on the same target inside [_armedWindow], so the day's total
+/// stays trustworthy without a dialog interrupting every drink.
+class _QuickAddRow extends StatefulWidget {
   const _QuickAddRow({required this.settings});
 
   final WaterSettings settings;
 
   @override
-  Widget build(BuildContext context) {
-    final amounts = settings.quickAddAmountsMl;
+  State<_QuickAddRow> createState() => _QuickAddRowState();
+}
 
-    return Row(
+class _QuickAddRowState extends State<_QuickAddRow> {
+  /// Long enough to read the hint and tap again, short enough that a forgotten
+  /// armed button cannot be committed much later by accident.
+  static const Duration _armedWindow = Duration(seconds: 4);
+
+  int? _armedIndex;
+  Timer? _disarmTimer;
+  ScrollNotificationObserverState? _scrollObserver;
+
+  @override
+  void didUpdateWidget(_QuickAddRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // quickAddAmountsMl is derived from the glass and bottle sizes and is a Set,
+    // so editing those can both reorder it and shorten it. An armed index left
+    // over from the old list would confirm an amount the button never showed,
+    // or point past the end of the new one.
+    final before = oldWidget.settings.quickAddAmountsMl;
+    final now = widget.settings.quickAddAmountsMl;
+    final sameList =
+        before.length == now.length &&
+        List.generate(now.length, (i) => before[i] == now[i]).every((e) => e);
+    if (!sameList) _disarm();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Scrolling the page is a strong signal the user has moved on, so it should
+    // cancel a pending confirmation. Null-safe because the observer only exists
+    // under a Scaffold.
+    final observer = ScrollNotificationObserver.maybeOf(context);
+    if (observer == _scrollObserver) return;
+    _scrollObserver?.removeListener(_onScroll);
+    _scrollObserver = observer;
+    _scrollObserver?.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollObserver?.removeListener(_onScroll);
+    _disarmTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onScroll(ScrollNotification notification) {
+    if (_armedIndex == null) return;
+    if (notification is ScrollStartNotification) _disarm();
+  }
+
+  void _disarm() {
+    _disarmTimer?.cancel();
+    _disarmTimer = null;
+    if (_armedIndex != null && mounted) setState(() => _armedIndex = null);
+  }
+
+  void _handleTap(int index, int amountMl) {
+    if (_armedIndex != index) {
+      // Arming a different amount replaces the previous one rather than
+      // stacking, so only ever one button is live.
+      setState(() => _armedIndex = index);
+      _disarmTimer?.cancel();
+      _disarmTimer = Timer(_armedWindow, _disarm);
+      return;
+    }
+    _disarm();
+    _log(amountMl);
+  }
+
+  Future<void> _log(int amountMl) async {
+    final state = AppScope.read(context);
+    await state.addWater(amountMl);
+    if (!mounted) return;
+    _showLoggedSnack(context, amountMl, widget.settings);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = widget.settings;
+    final amounts = settings.quickAddAmountsMl;
+    // Belt and braces alongside didUpdateWidget: never index past the row.
+    final index = _armedIndex;
+    final armed = (index != null && index < amounts.length) ? index : null;
+
+    return Column(
       children: [
-        for (var i = 0; i < amounts.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(
-            child: _AmountButton(
-              amountMl: amounts[i],
-              settings: settings,
-              emphasised: amounts[i] == settings.effectiveReminderAmountMl,
-            ),
-          ),
-        ],
+        Row(
+          children: [
+            for (var i = 0; i < amounts.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(
+                child: _AmountButton(
+                  amountMl: amounts[i],
+                  settings: settings,
+                  emphasised: amounts[i] == settings.effectiveReminderAmountMl,
+                  armed: armed == i,
+                  onTap: () => _handleTap(i, amounts[i]),
+                ),
+              ),
+            ],
+          ],
+        ),
+        // Reserves no space when idle, so the buttons do not shift the page.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: armed == null
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Tap ${formatVolume(amounts[armed], settings)} again '
+                    'to log it',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.of(context).kelp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -242,59 +359,83 @@ class _AmountButton extends StatelessWidget {
   const _AmountButton({
     required this.amountMl,
     required this.settings,
+    required this.armed,
+    required this.onTap,
     this.emphasised = false,
   });
 
   final int amountMl;
   final WaterSettings settings;
+
+  /// Waiting for its second tap.
+  final bool armed;
+  final VoidCallback onTap;
   final bool emphasised;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: emphasised
-          ? AppColors.of(context).aqua
-          : AppColors.of(context).panel,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () async {
-          await AppScope.read(context).addWater(amountMl);
-          if (!context.mounted) return;
-          _showLoggedSnack(context, amountMl, settings);
-        },
-        child: Container(
-          height: 66,
-          decoration: BoxDecoration(
+    final palette = AppColors.of(context);
+    final label = formatVolumeCompact(amountMl, settings);
+
+    // Armed wins over emphasised: green reads as "about to happen" and is the
+    // only green on this screen, so it cannot be mistaken for the blue default.
+    final Color fill = armed
+        ? palette.kelp
+        : emphasised
+        ? palette.aqua
+        : palette.panel;
+    final Color border = armed
+        ? palette.kelp
+        : emphasised
+        ? palette.aqua
+        : palette.hairline;
+    final Color foreground = armed || emphasised
+        ? palette.onAccent
+        : palette.ink;
+
+    return Semantics(
+      button: true,
+      label: armed
+          ? 'Confirm logging ${formatVolume(amountMl, settings)}'
+          : 'Log ${formatVolume(amountMl, settings)}, tap twice to confirm',
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: border),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: emphasised
-                  ? AppColors.of(context).aqua
-                  : AppColors.of(context).hairline,
+            onTap: onTap,
+            child: SizedBox(
+              height: 66,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    armed ? Icons.check_rounded : Icons.add,
+                    size: armed ? 19 : 16,
+                    color: armed || emphasised
+                        ? palette.onAccent
+                        : palette.aqua,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      color: foreground,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.add,
-                size: 16,
-                color: emphasised
-                    ? AppColors.of(context).onAccent
-                    : AppColors.of(context).aqua,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                formatVolumeCompact(amountMl, settings),
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                  color: emphasised
-                      ? AppColors.of(context).onAccent
-                      : AppColors.of(context).ink,
-                ),
-              ),
-            ],
           ),
         ),
       ),

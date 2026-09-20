@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release builds run the resource shrinker as well as R8. The status-bar icon is
+  never named in Java or XML — Dart passes the string "ic_notification" to the
+  notifications plugin, which resolves it at runtime with
+  Resources.getIdentifier(). The shrinker cannot see that, so the drawable looks
+  unused and can be stripped; the alarm then fires and fails on a missing icon.
+  Listing it here makes it explicitly reachable.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notification,@mipmap/ic_launcher,@mipmap/ic_launcher_round,@mipmap/ic_launcher_foreground,@mipmap/ic_launcher_monochrome"
+    tools:shrinkMode="safe" />

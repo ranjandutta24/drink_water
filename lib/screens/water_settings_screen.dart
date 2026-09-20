@@ -552,6 +552,7 @@ class _DeliveryPanel extends StatefulWidget {
 class _DeliveryPanelState extends State<_DeliveryPanel> {
   bool? _exactAllowed;
   bool? _notificationsAllowed;
+  int? _pending;
 
   @override
   void initState() {
@@ -563,11 +564,30 @@ class _DeliveryPanelState extends State<_DeliveryPanel> {
     final service = NotificationService.instance;
     final exact = await service.canScheduleExactAlarms();
     final enabled = await service.areNotificationsEnabled();
+    final pending = await service.pendingCount();
     if (!mounted) return;
     setState(() {
       _exactAllowed = exact;
       _notificationsAllowed = enabled;
+      _pending = pending;
     });
+  }
+
+  Future<void> _runSelfTest() async {
+    final when = await NotificationService.instance.scheduleSelfTest();
+    if (!mounted) return;
+    await _refreshPermissions();
+    if (!mounted) return;
+    final clock = formatClock(when, use24h: widget.settings.use24hClock);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Scheduled for $clock. Close the app completely — '
+          'it should arrive anyway.',
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   @override
@@ -628,6 +648,41 @@ class _DeliveryPanelState extends State<_DeliveryPanel> {
                 const SnackBar(content: Text('Test reminder sent')),
               );
             },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Test a reminder in 1 minute'),
+            subtitle: Text(
+              'Then close the app — this is the only way to be sure '
+              'reminders arrive when it is not running',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            onTap: _runSelfTest,
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Icon(
+              _pending == 0
+                  ? Icons.error_outline
+                  : Icons.event_available_outlined,
+              color: _pending == 0 ? AppColors.of(context).clay : null,
+            ),
+            title: Text(
+              _pending == null
+                  ? 'Checking scheduled reminders…'
+                  : '$_pending reminder${_pending == 1 ? '' : 's'} '
+                        'queued with Android',
+            ),
+            subtitle: Text(
+              _pending == 0
+                  ? 'Nothing is queued. Reopening the app rebuilds the '
+                        'schedule; if it empties again, battery optimisation '
+                        'is likely killing it.'
+                  : 'Tap to refresh',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            onTap: _refreshPermissions,
           ),
         ],
       ),

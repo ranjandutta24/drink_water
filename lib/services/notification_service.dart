@@ -24,6 +24,7 @@ const String kActionSkip = 'medicine_skip';
 /// touches another.
 const int _waterIdBase = 1000;
 const int _waterSnoozeId = 999;
+const int _selfTestId = 998;
 const int _medicineIdBase = 100000;
 
 /// Tint Android applies to the small icon and the app name in the shade. Hard
@@ -215,9 +216,6 @@ class NotificationService {
     return await android.canScheduleExactNotifications() ?? false;
   }
 
-  Future<List<PendingNotificationRequest>> pending() =>
-      _plugin.pendingNotificationRequests();
-
   // --- Scheduling -----------------------------------------------------------
 
   /// Rebuilds the entire schedule from scratch. Called after any settings or
@@ -227,7 +225,11 @@ class NotificationService {
     required List<Medicine> medicines,
   }) async {
     await init();
-    await _plugin.cancelAll();
+    // Not cancelAll(): that also killed a pending one-minute self test, so
+    // toggling any setting during the test made it look like the phone had
+    // dropped the alarm — a false negative in the one diagnostic meant to rule
+    // that out.
+    await _cancelWhere((id) => id != _selfTestId);
     await scheduleWaterReminders(settings);
     await scheduleMedicineReminders(medicines, use24h: settings.use24hClock);
   }
@@ -236,7 +238,7 @@ class NotificationService {
   /// daily-repeating alarm per slot.
   Future<void> scheduleWaterReminders(WaterSettings settings) async {
     await init();
-    await _cancelRange(_waterIdBase, _waterIdBase + 400);
+    await _cancelWhere((id) => id >= _waterIdBase && id <= _waterIdBase + 400);
     await _plugin.cancel(_waterSnoozeId);
 
     if (!settings.remindersEnabled || settings.intervalMinutes <= 0) return;
@@ -446,14 +448,63 @@ class NotificationService {
     );
   }
 
+  /// Schedules one reminder a minute out through exactly the same AlarmManager
+  /// path a real reminder uses, so it can be used to prove delivery while the
+  /// app is closed or swiped away. [showTestNotification] cannot prove that: it
+  /// posts immediately from the running process, which is the one case that was
+  /// never in doubt.
+  Future<DateTime> scheduleSelfTest() async {
+    await init();
+    final when = tz.TZDateTime.now(tz.local).add(const Duration(minutes: 1));
+    final exact = await canScheduleExactAlarms();
+    await _plugin.zonedSchedule(
+      _selfTestId,
+      'Reminders survive a closed app',
+      'This was scheduled a minute ago and fired on its own.',
+      when,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _waterChannel.id,
+          _waterChannel.name,
+          channelDescription: _waterChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          color: _notificationAccent,
+          category: AndroidNotificationCategory.reminder,
+        ),
+      ),
+      androidScheduleMode: exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+    return DateTime.fromMillisecondsSinceEpoch(when.millisecondsSinceEpoch);
+  }
+
+  /// How many reminders Android is currently holding for us. Zero while
+  /// reminders are on is the tell-tale that something dropped the schedule —
+  /// usually a force-stop or an aggressive battery optimiser.
+  Future<int> pendingCount() async {
+    await init();
+    final requests = await _plugin.pendingNotificationRequests();
+    // A snooze or a self test is not part of the schedule, so counting them
+    // would overstate how healthy it is.
+    return requests
+        .where((r) => r.id != _selfTestId && r.id != _waterSnoozeId)
+        .length;
+  }
+
   Future<void> cancelAll() async {
     await init();
     await _plugin.cancelAll();
   }
 
-  Future<void> _cancelRange(int from, int to) async {
-    for (var id = from; id <= to; id++) {
-      await _plugin.cancel(id);
+  /// Cancels only the alarms Android is actually holding, rather than firing a
+  /// cancel at every id in a range: asking once and cancelling what comes back
+  /// replaces ~400 platform calls per settings change with a handful.
+  Future<void> _cancelWhere(bool Function(int id) matches) async {
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final request in pending) {
+      if (matches(request.id)) await _plugin.cancel(request.id);
     }
   }
 

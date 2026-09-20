@@ -39,6 +39,13 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Flutter's Gradle plugin already sets minifyEnabled/shrinkResources
+            // here and appends proguard-rules.pro from this directory when the
+            // file exists. It does exist, and it must: without its keep rules R8
+            // renames the notification plugin's model classes, scheduled alarms
+            // can no longer be deserialised when they fire, and reminders stop
+            // arriving in release builds only. Do not delete that file.
         }
     }
 }
