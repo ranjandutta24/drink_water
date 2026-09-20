@@ -22,24 +22,42 @@ class Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stripe = accent;
+
+    // The stripe is drawn with a Stack rather than a stretched Row: a Row's
+    // cross axis is vertical, so CrossAxisAlignment.stretch demands a bounded
+    // height — which a panel inside a scrolling list never has. A Stack instead
+    // sizes itself to the padded content and lets the stripe fill that height.
+    final Widget body = stripe == null
+        ? Padding(padding: padding, child: child)
+        : Stack(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  padding.left + 4,
+                  padding.top,
+                  padding.right,
+                  padding.bottom,
+                ),
+                child: child,
+              ),
+              Positioned(
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: 4,
+                child: ColoredBox(color: stripe),
+              ),
+            ],
+          );
+
     final content = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.hairline),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (accent != null) Container(width: 4, color: accent),
-            Expanded(
-              child: Padding(padding: padding, child: child),
-            ),
-          ],
-        ),
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(17), child: body),
     );
 
     if (onTap == null) return content;
