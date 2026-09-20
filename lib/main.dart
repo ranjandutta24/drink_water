@@ -6,6 +6,7 @@ import 'state/app_state.dart';
 import 'theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const DrinkWaterApp());
 }
 
@@ -42,23 +43,37 @@ class _DrinkWaterAppState extends State<DrinkWaterApp> {
     return FutureBuilder<AppState>(
       future: _bootstrap,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _Frame(child: _StartupError(error: snapshot.error!));
+        }
         final state = snapshot.data;
-        return MaterialApp(
-          title: 'Drink Water',
-          debugShowCheckedModeBanner: false,
-          theme: buildAppTheme(),
-          // The scope has to sit above the Navigator, otherwise pushed routes
-          // are siblings of `home` and cannot see it.
-          builder: state == null
-              ? null
-              : (context, child) => AppScope(state: state, child: child!),
-          home: snapshot.hasError
-              ? _StartupError(error: snapshot.error!)
-              : state == null
-              ? const _Splash()
-              : const ShellScreen(),
+        if (state == null) return const _Frame(child: _Splash());
+
+        // AppScope sits *above* MaterialApp so the Navigator — and therefore
+        // every pushed route — is a descendant of it.
+        return AppScope(
+          state: state,
+          child: const _Frame(child: ShellScreen()),
         );
       },
+    );
+  }
+}
+
+/// The MaterialApp itself. Split out so it can be reused for every startup
+/// state without duplicating the theme.
+class _Frame extends StatelessWidget {
+  const _Frame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Drink Water',
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(),
+      home: child,
     );
   }
 }

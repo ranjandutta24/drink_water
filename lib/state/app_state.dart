@@ -264,14 +264,27 @@ class AppScope extends InheritedNotifier<AppState> {
 
   static AppState of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, 'AppScope was not found in the widget tree.');
-    return scope!.notifier!;
+    return _require(scope);
   }
 
   /// Reads the state without subscribing to changes — for callbacks.
   static AppState read(BuildContext context) {
     final scope = context.getInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, 'AppScope was not found in the widget tree.');
-    return scope!.notifier!;
+    return _require(scope);
+  }
+
+  /// Fails loudly and legibly. A bare `!` here produced an opaque
+  /// "Null check operator used on a null value" that said nothing about the
+  /// actual problem, which is always a widget built outside the scope.
+  static AppState _require(AppScope? scope) {
+    final state = scope?.notifier;
+    if (state == null) {
+      throw FlutterError(
+        'AppScope was not found above this widget.\n'
+        'AppScope must sit above MaterialApp so that pushed routes can reach '
+        'it. See main.dart.',
+      );
+    }
+    return state;
   }
 }
