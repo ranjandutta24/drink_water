@@ -40,6 +40,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             selected: state.themeMode,
             onSelected: (mode) => AppScope.read(context).setThemeMode(mode),
           ),
+          const SizedBox(height: 14),
+          _FontPicker(
+            selected: state.font,
+            onSelected: (font) => AppScope.read(context).setFont(font),
+          ),
           const SizedBox(height: 22),
           const SectionHeader(title: 'Backup'),
           Panel(
@@ -418,6 +423,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// Each row is set in the font it offers — a font list that all renders in the
+/// same typeface tells you nothing. The sample uses digits and a unit because
+/// that is what this app actually shows you all day.
+class _FontPicker extends StatelessWidget {
+  const _FontPicker({required this.selected, required this.onSelected});
+
+  final AppFont selected;
+  final ValueChanged<AppFont> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Panel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (final font in AppFont.values) ...[
+            if (font != AppFont.values.first)
+              Divider(height: 1, color: palette.hairline),
+            _FontRow(
+              font: font,
+              selected: font == selected,
+              onTap: () => onSelected(font),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FontRow extends StatelessWidget {
+  const _FontRow({
+    required this.font,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppFont font;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${font.label} font',
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        font.label,
+                        style: TextStyle(
+                          fontFamily: font.family,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? palette.aquaDeep : palette.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        font.note,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // The sample, so the choice can be judged before it is made.
+                Text(
+                  '1,850 ml',
+                  style: TextStyle(
+                    fontFamily: font.family,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                    color: palette.inkSoft,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 19,
+                  color: selected ? palette.aqua : palette.hairline,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

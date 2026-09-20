@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import '../models/medicine.dart';
 import '../models/water_log.dart';
 import '../models/water_settings.dart';
+import '../theme.dart' show AppFont;
 
 /// Result of parsing a user-supplied backup file.
 class BackupBundle {
@@ -16,11 +17,16 @@ class BackupBundle {
     required this.exportedAt,
     required this.schemaVersion,
     this.themeMode,
+    this.font,
   });
 
   /// Null when the file predates the appearance setting — in that case the
   /// current theme is left alone rather than reset to "system".
   final ThemeMode? themeMode;
+
+  /// Same contract as [themeMode]: null means "the file said nothing about the
+  /// font", so keep whatever the user is already using.
+  final AppFont? font;
 
   final WaterSettings settings;
   final List<Medicine> medicines;
@@ -59,6 +65,7 @@ class BackupService {
     required List<WaterEntry> waterLog,
     required List<MedicineIntake> medicineLog,
     ThemeMode themeMode = ThemeMode.system,
+    AppFont font = AppFont.system,
   }) {
     final payload = <String, dynamic>{
       'app': _appId,
@@ -66,7 +73,10 @@ class BackupService {
       'exportedAt': DateTime.now().toIso8601String(),
       // Additive, so the version stays at 1: older builds ignore the key and
       // newer ones treat its absence as "leave the theme as it is".
-      'appearance': <String, dynamic>{'themeMode': themeMode.name},
+      'appearance': <String, dynamic>{
+        'themeMode': themeMode.name,
+        'font': font.name,
+      },
       'waterSettings': settings.toJson(),
       'medicines': medicines.map((medicine) => medicine.toJson()).toList(),
       'waterLog': waterLog.map((entry) => entry.toJson()).toList(),
@@ -158,6 +168,7 @@ class BackupService {
       exportedAt: DateTime.tryParse('${decoded['exportedAt']}'),
       schemaVersion: version,
       themeMode: _readThemeMode(decoded['appearance']),
+      font: _readFont(decoded['appearance']),
     );
   }
 
@@ -169,6 +180,17 @@ class BackupService {
     if (name is! String) return null;
     for (final mode in ThemeMode.values) {
       if (mode.name == name) return mode;
+    }
+    return null;
+  }
+
+  /// Null for anything unrecognised, for the same reason as [_readThemeMode].
+  static AppFont? _readFont(Object? appearance) {
+    if (appearance is! Map) return null;
+    final name = appearance['font'];
+    if (name is! String) return null;
+    for (final font in AppFont.values) {
+      if (font.name == name) return font;
     }
     return null;
   }

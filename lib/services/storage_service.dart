@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/medicine.dart';
 import '../models/water_log.dart';
 import '../models/water_settings.dart';
+import '../theme.dart' show AppFont, appFontFromName;
 
 /// Tolerant parse of a stored or imported theme-mode name. Anything unknown —
 /// including null, from an older backup that predates the setting — means
@@ -31,6 +32,7 @@ class StorageService {
   static const _kWaterLog = 'water_log_v1';
   static const _kMedicineLog = 'medicine_log_v1';
   static const _kThemeMode = 'theme_mode_v1';
+  static const _kFont = 'app_font_v1';
 
   final SharedPreferences _prefs;
 
@@ -71,6 +73,10 @@ class StorageService {
 
   Future<void> saveThemeMode(ThemeMode mode) =>
       _prefs.setString(_kThemeMode, mode.name);
+
+  AppFont loadFont() => appFontFromName(_prefs.getString(_kFont));
+
+  Future<void> saveFont(AppFont font) => _prefs.setString(_kFont, font.name);
 
   // --- Medicines ------------------------------------------------------------
 
@@ -117,8 +123,8 @@ class StorageService {
     await _prefs.remove(_kMedicines);
     await _prefs.remove(_kWaterLog);
     await _prefs.remove(_kMedicineLog);
-    // The theme choice is a preference, not data: erasing the log should not
-    // throw the user back into a theme they did not pick.
+    // The theme and font choices are preferences, not data: erasing the log
+    // should not throw the user back into an appearance they did not pick.
   }
 
   // --- helpers --------------------------------------------------------------

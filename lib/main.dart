@@ -5,11 +5,18 @@ import 'services/notification_service.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
-/// Built once. _Frame rebuilds on every state change (it listens for theme-mode
-/// changes), and each ThemeData involves a seeded ColorScheme plus a dozen
-/// sub-themes — not something to redo every time a drink is logged.
-final ThemeData _lightTheme = buildLightTheme();
-final ThemeData _darkTheme = buildDarkTheme();
+/// Built once per font, then reused. _Frame rebuilds on every state change (it
+/// listens for appearance changes), and each ThemeData involves a seeded
+/// ColorScheme plus a dozen sub-themes — not something to redo every time a
+/// drink is logged. There are only four fonts, so the cache never grows.
+final Map<AppFont, ThemeData> _lightThemes = <AppFont, ThemeData>{};
+final Map<AppFont, ThemeData> _darkThemes = <AppFont, ThemeData>{};
+
+ThemeData _lightTheme(AppFont font) =>
+    _lightThemes.putIfAbsent(font, () => buildLightTheme(font));
+
+ThemeData _darkTheme(AppFont font) =>
+    _darkThemes.putIfAbsent(font, () => buildDarkTheme(font));
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,10 +69,14 @@ class _DrinkWaterAppState extends State<DrinkWaterApp> {
         return AppScope(
           state: state,
           child: Builder(
-            builder: (context) => _Frame(
-              themeMode: AppScope.of(context).themeMode,
-              child: const ShellScreen(),
-            ),
+            builder: (context) {
+              final appearance = AppScope.of(context);
+              return _Frame(
+                themeMode: appearance.themeMode,
+                font: appearance.font,
+                child: const ShellScreen(),
+              );
+            },
           ),
         );
       },
@@ -76,18 +87,23 @@ class _DrinkWaterAppState extends State<DrinkWaterApp> {
 /// The MaterialApp itself. Split out so it can be reused for every startup
 /// state without duplicating the theme.
 class _Frame extends StatelessWidget {
-  const _Frame({required this.child, this.themeMode = ThemeMode.system});
+  const _Frame({
+    required this.child,
+    this.themeMode = ThemeMode.system,
+    this.font = AppFont.system,
+  });
 
   final Widget child;
   final ThemeMode themeMode;
+  final AppFont font;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Drink Water',
       debugShowCheckedModeBanner: false,
-      theme: _lightTheme,
-      darkTheme: _darkTheme,
+      theme: _lightTheme(font),
+      darkTheme: _darkTheme(font),
       themeMode: themeMode,
       home: child,
     );

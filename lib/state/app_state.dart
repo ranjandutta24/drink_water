@@ -7,6 +7,7 @@ import '../models/water_settings.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
+import '../theme.dart' show AppFont;
 
 /// Single source of truth for the UI. Deliberately dependency-free —
 /// exposed through [AppScope] below instead of a state-management package.
@@ -21,9 +22,11 @@ class AppState extends ChangeNotifier {
   List<WaterEntry> _waterLog = const [];
   List<MedicineIntake> _medicineLog = const [];
   ThemeMode _themeMode = ThemeMode.system;
+  AppFont _font = AppFont.system;
 
   WaterSettings get settings => _settings;
   ThemeMode get themeMode => _themeMode;
+  AppFont get font => _font;
   List<Medicine> get medicines => List.unmodifiable(_medicines);
   List<WaterEntry> get waterLog => List.unmodifiable(_waterLog);
   List<MedicineIntake> get medicineLog => List.unmodifiable(_medicineLog);
@@ -54,6 +57,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> _load() async {
     _themeMode = _storage.loadThemeMode();
+    _font = _storage.loadFont();
     _settings = _storage.loadSettings();
     _medicines = _storage.loadMedicines();
     _waterLog = _pruneOldEntries(_storage.loadWaterLog());
@@ -97,6 +101,13 @@ class AppState extends ChangeNotifier {
     _themeMode = mode;
     notifyListeners();
     await _storage.saveThemeMode(mode);
+  }
+
+  Future<void> setFont(AppFont font) async {
+    if (font == _font) return;
+    _font = font;
+    notifyListeners();
+    await _storage.saveFont(font);
   }
 
   // --- Water settings -------------------------------------------------------
@@ -211,6 +222,7 @@ class AppState extends ChangeNotifier {
     waterLog: _waterLog,
     medicineLog: _medicineLog,
     themeMode: _themeMode,
+    font: _font,
   );
 
   /// [merge] keeps existing data and adds anything new; otherwise the backup
@@ -255,9 +267,12 @@ class AppState extends ChangeNotifier {
     _settings = bundle.settings;
     final restoredTheme = bundle.themeMode;
     if (restoredTheme != null) _themeMode = restoredTheme;
+    final restoredFont = bundle.font;
+    if (restoredFont != null) _font = restoredFont;
     notifyListeners();
 
     if (restoredTheme != null) await _storage.saveThemeMode(restoredTheme);
+    if (restoredFont != null) await _storage.saveFont(restoredFont);
     await _storage.saveSettings(_settings);
     await _storage.saveMedicines(_medicines);
     await _storage.saveWaterLog(_waterLog);

@@ -35,3 +35,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bundled so the font picker works with no network and no runtime download.
+  # Licence text ships alongside the files (OFL, see assets/fonts/OFL.txt).
+  fonts:
+    - family: Play
+      fonts:
+        - asset: assets/fonts/Play-Regular.ttf
+        - asset: assets/fonts/Play-Bold.ttf
+          weight: 700

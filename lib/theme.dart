@@ -203,14 +203,47 @@ class AppColors {
       Theme.of(context).extension<AppPalette>() ?? AppPalette.light;
 }
 
-ThemeData buildLightTheme() => _buildTheme(AppPalette.light, Brightness.light);
+/// The typefaces offered in Settings.
+///
+/// Play is bundled from assets/fonts; the rest are families Android already has
+/// on disk. Either way nothing is downloaded at runtime. [family] is passed
+/// straight to Flutter as a font family name, and null means "whatever the
+/// platform's default is", which on Android is Roboto.
+enum AppFont {
+  system('Default', null, 'The font your phone uses everywhere else'),
+  roboto('Roboto', 'Roboto', "Android's own typeface — clean and neutral"),
+  play('Play', 'Play', 'Squared-off and a little technical'),
+  mono('Mono', 'monospace', 'Fixed width — every digit lines up');
 
-ThemeData buildDarkTheme() => _buildTheme(AppPalette.dark, Brightness.dark);
+  const AppFont(this.label, this.family, this.note);
 
-ThemeData _buildTheme(AppPalette palette, Brightness brightness) {
+  final String label;
+  final String? family;
+  final String note;
+}
+
+/// Tolerant parser: an unknown or missing name falls back to the default rather
+/// than throwing, so an old or hand-edited backup can never brick startup.
+AppFont appFontFromName(String? name) {
+  for (final font in AppFont.values) {
+    if (font.name == name) return font;
+  }
+  return AppFont.system;
+}
+
+ThemeData buildLightTheme([AppFont font = AppFont.system]) =>
+    _buildTheme(AppPalette.light, Brightness.light, font);
+
+ThemeData buildDarkTheme([AppFont font = AppFont.system]) =>
+    _buildTheme(AppPalette.dark, Brightness.dark, font);
+
+ThemeData _buildTheme(AppPalette palette, Brightness brightness, AppFont font) {
+  final family = font.family;
+
   final base = ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    fontFamily: family,
     colorScheme: ColorScheme.fromSeed(
       seedColor: palette.aqua,
       brightness: brightness,
@@ -224,56 +257,63 @@ ThemeData _buildTheme(AppPalette palette, Brightness brightness) {
     scaffoldBackgroundColor: palette.canvas,
   );
 
+  // Derived from base.textTheme with copyWith rather than built from bare
+  // TextStyles, so every style inherits the chosen font family instead of
+  // silently falling back to the platform default.
+  final inked = base.textTheme.apply(
+    bodyColor: palette.ink,
+    displayColor: palette.ink,
+  );
+
   return base.copyWith(
     extensions: <ThemeExtension<dynamic>>[palette],
-    textTheme: base.textTheme
-        .apply(bodyColor: palette.ink, displayColor: palette.ink)
-        .copyWith(
-          // Large numerals are the centrepiece of this app, so the display
-          // sizes are set tight and heavy rather than airy.
-          displayLarge: TextStyle(
-            fontSize: 56,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -2,
-            height: 1.0,
-            color: palette.ink,
-          ),
-          displayMedium: TextStyle(
-            fontSize: 38,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -1.2,
-            height: 1.05,
-            color: palette.ink,
-          ),
-          titleLarge: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.4,
-            color: palette.ink,
-          ),
-          titleMedium: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-            color: palette.ink,
-          ),
-          bodyMedium: TextStyle(
-            fontSize: 14.5,
-            height: 1.45,
-            color: palette.ink,
-          ),
-          bodySmall: TextStyle(
-            fontSize: 13,
-            height: 1.4,
-            color: palette.inkSoft,
-          ),
-        ),
+    textTheme: inked.copyWith(
+      // Large numerals are the centrepiece of this app, so the display sizes
+      // are set tight and heavy rather than airy.
+      displayLarge: inked.displayLarge?.copyWith(
+        fontSize: 56,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -2,
+        height: 1.0,
+        color: palette.ink,
+      ),
+      displayMedium: inked.displayMedium?.copyWith(
+        fontSize: 38,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -1.2,
+        height: 1.05,
+        color: palette.ink,
+      ),
+      titleLarge: inked.titleLarge?.copyWith(
+        fontSize: 21,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.4,
+        color: palette.ink,
+      ),
+      titleMedium: inked.titleMedium?.copyWith(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
+        color: palette.ink,
+      ),
+      bodyMedium: inked.bodyMedium?.copyWith(
+        fontSize: 14.5,
+        height: 1.45,
+        color: palette.ink,
+      ),
+      bodySmall: inked.bodySmall?.copyWith(
+        fontSize: 13,
+        height: 1.4,
+        color: palette.inkSoft,
+      ),
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: palette.canvas,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
+        fontFamily: family,
         fontSize: 22,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.6,
@@ -313,15 +353,19 @@ ThemeData _buildTheme(AppPalette palette, Brightness brightness) {
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: palette.aqua, width: 1.6),
       ),
-      labelStyle: TextStyle(color: palette.inkSoft),
-      hintStyle: TextStyle(color: palette.inkSoft),
+      labelStyle: TextStyle(fontFamily: family, color: palette.inkSoft),
+      hintStyle: TextStyle(fontFamily: family, color: palette.inkSoft),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: palette.aqua,
         foregroundColor: palette.onAccent,
         minimumSize: const Size.fromHeight(52),
-        textStyle: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontFamily: family,
+          fontSize: 15.5,
+          fontWeight: FontWeight.w600,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
@@ -330,7 +374,11 @@ ThemeData _buildTheme(AppPalette palette, Brightness brightness) {
         foregroundColor: palette.ink,
         minimumSize: const Size.fromHeight(52),
         side: BorderSide(color: palette.hairline),
-        textStyle: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600),
+        textStyle: TextStyle(
+          fontFamily: family,
+          fontSize: 15.5,
+          fontWeight: FontWeight.w600,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
@@ -344,6 +392,7 @@ ThemeData _buildTheme(AppPalette palette, Brightness brightness) {
       height: 68,
       labelTextStyle: WidgetStatePropertyAll(
         TextStyle(
+          fontFamily: family,
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: palette.ink,
@@ -362,6 +411,7 @@ ThemeData _buildTheme(AppPalette palette, Brightness brightness) {
           ? palette.ink
           : palette.panel,
       contentTextStyle: TextStyle(
+        fontFamily: family,
         color: brightness == Brightness.light ? palette.panel : palette.ink,
         fontSize: 14.5,
       ),

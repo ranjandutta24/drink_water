@@ -306,6 +306,55 @@ void main() {
 
       expect(bundle.themeMode, isNull);
     });
+
+    test('carries the font choice through an export and back', () {
+      final json = BackupService.encode(
+        settings: const WaterSettings(),
+        medicines: const [],
+        waterLog: const [],
+        medicineLog: const [],
+        font: AppFont.play,
+      );
+
+      expect(BackupService.decode(json).font, AppFont.play);
+    });
+
+    test('leaves the font alone when the value is missing or unknown', () {
+      final noAppearance = BackupService.decode(
+        '{"app":"drink_water","schemaVersion":1,'
+        '"waterSettings":{"intervalMinutes":60}}',
+      );
+      final nonsense = BackupService.decode(
+        '{"app":"drink_water","schemaVersion":1,'
+        '"appearance":{"font":"comic"},'
+        '"waterSettings":{"intervalMinutes":60}}',
+      );
+
+      expect(noAppearance.font, isNull);
+      expect(nonsense.font, isNull);
+    });
+  });
+
+  group('font', () {
+    test('stored names map back, unknown values fall back to the default', () {
+      expect(appFontFromName('play'), AppFont.play);
+      expect(appFontFromName('mono'), AppFont.mono);
+      expect(appFontFromName('roboto'), AppFont.roboto);
+      expect(appFontFromName(null), AppFont.system);
+      expect(appFontFromName('comic'), AppFont.system);
+    });
+
+    test('the chosen family reaches the styles the app actually uses', () {
+      final theme = buildLightTheme(AppFont.play);
+
+      expect(theme.textTheme.bodyMedium?.fontFamily, 'Play');
+      expect(theme.textTheme.displayLarge?.fontFamily, 'Play');
+      expect(theme.appBarTheme.titleTextStyle?.fontFamily, 'Play');
+      // The default must pin nothing, so the platform gets to choose. Asserted
+      // on the input rather than the built theme: ThemeData always merges in
+      // Typography, which names a family (Roboto on Android) regardless.
+      expect(AppFont.system.family, isNull);
+    });
   });
 
   group('theme', () {
