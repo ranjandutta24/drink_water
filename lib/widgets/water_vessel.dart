@@ -54,9 +54,19 @@ class _WaterVesselState extends State<WaterVessel>
     _level = AlwaysStoppedAnimation(widget.progress.clamp(0.0, 1.0));
     _shownProgress = widget.progress.clamp(0.0, 1.0);
     _animateTo(widget.progress);
+  }
 
-    // Respect reduced-motion: the ripple is decorative, the fill is not.
-    _waves.repeat();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Respect reduced-motion: the ripple is decorative, the fill is not. This
+    // lives here rather than in initState because it needs MediaQuery.
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (reduceMotion) {
+      _waves.stop();
+    } else if (!_waves.isAnimating) {
+      _waves.repeat();
+    }
   }
 
   @override
@@ -95,46 +105,52 @@ class _WaterVesselState extends State<WaterVessel>
     return SizedBox(
       width: widget.size.width,
       height: widget.size.height,
-      child: Semantics(
-        label: '${widget.primaryLabel} ${widget.secondaryLabel}',
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_waves, _fill]),
-          builder: (context, _) {
-            return CustomPaint(
+      // The labels are passed as AnimatedBuilder's `child` so this subtree is
+      // built once instead of on every frame of the wave animation — and so no
+      // semantics node sits on top of the repainting CustomPaint, which is what
+      // tripped the framework's '!semantics.parentDataDirty' assertion.
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_waves, _fill]),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 28),
+            child: MergeSemantics(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.primaryLabel,
+                    style: theme.textTheme.displayMedium?.copyWith(
+                      color: AppColors.marine,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.secondaryLabel,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.aquaDeep,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        builder: (context, child) {
+          return RepaintBoundary(
+            child: CustomPaint(
               painter: _VesselPainter(
                 level: _level.value,
                 phase: reduceMotion ? 0 : _waves.value * 2 * math.pi,
                 animateWaves: !reduceMotion,
                 overflowing: overflowing,
               ),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.primaryLabel,
-                        style: theme.textTheme.displayMedium?.copyWith(
-                          color: AppColors.marine,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.secondaryLabel,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.aquaDeep,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }

@@ -18,6 +18,13 @@ class ShellScreen extends StatefulWidget {
 class _ShellScreenState extends State<ShellScreen> with WidgetsBindingObserver {
   int _index = 0;
 
+  static const List<Widget> _pages = [
+    HomeScreen(),
+    MedicinesScreen(),
+    ReportsScreen(),
+    BackupScreen(),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -43,11 +50,13 @@ class _ShellScreenState extends State<ShellScreen> with WidgetsBindingObserver {
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const [
-          HomeScreen(),
-          MedicinesScreen(),
-          ReportsScreen(),
-          BackupScreen(),
+        children: [
+          // TickerMode stops the hidden tabs from driving animations (and from
+          // repainting) while they sit off screen. IndexedStack keeps them in
+          // the tree, so without this the carafe animates forever in the
+          // background.
+          for (var i = 0; i < _pages.length; i++)
+            TickerMode(enabled: _index == i, child: _pages[i]),
         ],
       ),
       bottomNavigationBar: NavigationBar(
