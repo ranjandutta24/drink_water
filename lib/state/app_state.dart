@@ -31,14 +31,24 @@ class AppState extends ChangeNotifier {
   static Future<AppState> create() async {
     final storage = await StorageService.open();
     final notifications = NotificationService.instance;
-    await notifications.init();
     final state = AppState(storage, notifications);
     await state._load();
-    // Re-commit the schedule on every cold start. Android drops pending alarms
-    // on force-stop and some OEM battery optimisations, so this is the cheapest
-    // possible self-healing.
-    await state.applySchedule();
-    notifications.dataChanged.addListener(state.reloadFromDisk);
+
+    // Notifications must never take the whole app down with them. A platform
+    // problem here (a missing icon resource, a revoked permission, an OEM alarm
+    // quirk) used to surface as "the app could not load your data" even though
+    // the data was fine. Log it and carry on with a usable UI instead.
+    try {
+      await notifications.init();
+      // Re-commit the schedule on every cold start. Android drops pending
+      // alarms on force-stop and some OEM battery optimisations, so this is the
+      // cheapest possible self-healing.
+      await state.applySchedule();
+      notifications.dataChanged.addListener(state.reloadFromDisk);
+    } catch (error, stack) {
+      debugPrint('Notification setup failed at startup: $error\n$stack');
+    }
+
     return state;
   }
 

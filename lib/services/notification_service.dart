@@ -138,9 +138,12 @@ class NotificationService {
     // A dedicated status-bar icon rather than the launcher icon: Android masks
     // small icons to their alpha channel, so a full-colour launcher icon with
     // an opaque plate renders as a solid white square.
-    const androidSettings = AndroidInitializationSettings(
-      '@drawable/ic_notification',
-    );
+    //
+    // The name must be bare — no '@drawable/' prefix. The plugin resolves it
+    // with Resources.getIdentifier(name, "drawable", package), which treats the
+    // prefix as part of the name and then fails initialise() with
+    // 'invalid_icon'. The file lives in res/drawable-{mdpi…xxxhdpi}.
+    const androidSettings = AndroidInitializationSettings('ic_notification');
     await _plugin.initialize(
       const InitializationSettings(android: androidSettings),
       onDidReceiveNotificationResponse: _onForegroundResponse,
