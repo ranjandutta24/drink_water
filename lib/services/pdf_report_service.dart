@@ -134,6 +134,26 @@ class PdfReportService {
     );
   }
 
+  /// Heading above each block. A left rule rather than a bigger typeface, so the
+  /// sections stay distinguishable in grayscale — these get printed.
+  static pw.Widget _sectionTitle(String title) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Container(width: 3, height: 13, color: _aqua),
+        pw.SizedBox(width: 7),
+        pw.Text(
+          title,
+          style: pw.TextStyle(
+            fontSize: 12.5,
+            fontWeight: pw.FontWeight.bold,
+            color: _ink,
+          ),
+        ),
+      ],
+    );
+  }
+
   static String _range(PeriodReport report) {
     final start = report.start;
     final end = report.end;
