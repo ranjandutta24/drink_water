@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Next-dose widget metadata.
+
+  This one genuinely needs its periodic update: "next dose" changes as the day
+  advances even when nothing is logged and nothing in the app changes, so without
+  the timer a widget could sit showing a dose whose time passed hours ago. Thirty
+  minutes is the platform floor and is close enough for a reminder of this kind.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_medicine"
+    android:previewLayout="@layout/widget_medicine"
+    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/widget_medicine_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

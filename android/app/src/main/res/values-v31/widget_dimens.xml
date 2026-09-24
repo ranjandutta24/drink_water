@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12 exposes the radius the launcher itself uses for widget corners, so
+  matching it stops the card from looking inset inside the system clip.
+-->
+<resources>
+    <dimen name="widget_corner_radius">@android:dimen/system_app_widget_background_radius</dimen>
+    <dimen name="widget_button_radius">@android:dimen/system_app_widget_inner_radius</dimen>
+</resources>

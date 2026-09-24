@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Strings for the home screen widgets.
+
+  These live in resources rather than being pushed over from Dart because the
+  launcher renders the widget picker, and the preview labels, with the app process
+  not running. Anything shown as a formatted figure (totals, times) is still set
+  from Kotlin at update time so it follows the user's own units and clock setting.
+-->
+<resources>
+    <string name="widget_water_title">Water today</string>
+    <string name="widget_water_description">Today\'s hydration with buttons to log a drink.</string>
+    <!-- Both take an already-formatted volume, because the unit is the user's
+         choice (ml, litres, glasses, bottles) and only Kotlin knows it. -->
+    <string name="widget_water_to_go">%1$s to go · goal %2$s</string>
+    <string name="widget_water_reached">Goal reached · %1$s</string>
+
+    <string name="widget_medicine_label">Next dose</string>
+    <string name="widget_medicine_title">Next medicine</string>
+    <string name="widget_medicine_description">The next dose due today, with a button to mark it taken.</string>
+    <string name="widget_medicine_taken">Taken</string>
+    <string name="widget_medicine_none">All done today</string>
+    <string name="widget_medicine_none_detail">Nothing else scheduled</string>
+    <string name="widget_medicine_empty">No medicines yet</string>
+    <string name="widget_medicine_empty_detail">Add one in the app to see it here</string>
+    <!-- %1$s is the dose's clock time, %2$s the gap strings below. -->
+    <string name="widget_medicine_at_in">%1$s · in %2$s</string>
+    <string name="widget_medicine_at_now">%1$s · now</string>
+    <string name="widget_medicine_at_overdue">%1$s · %2$s overdue</string>
+    <string name="widget_gap_minutes">%1$d min</string>
+    <string name="widget_gap_hours">%1$d h</string>
+    <string name="widget_gap_hours_minutes">%1$d h %2$d min</string>
+</resources>

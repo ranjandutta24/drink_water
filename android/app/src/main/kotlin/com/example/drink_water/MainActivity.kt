@@ -2,12 +2,15 @@ package com.example.drink_water
 
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Hosts the Flutter UI and a tiny sound channel.
+ * Hosts the Flutter UI, a tiny sound channel, and the home screen widget refresh.
+ *
+ * There is deliberately no widget method channel — see [refreshWidgets].
  *
  * The one short effect this app plays (a swallow, when water is logged) is not
  * worth an audio package: SoundPool decodes it once when the engine is
@@ -47,6 +50,42 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+    }
+
+    /**
+     * Redraws both widgets from whatever is on disk now.
+     *
+     * Driven from [onPause] rather than from Dart over a method channel. The home
+     * screen only becomes visible once the app is on its way out, so a single hook
+     * there covers every write path there is; a channel would be a second
+     * mechanism for the same job, and one the save paths could forget to call.
+     */
+    private fun refreshWidgets() {
+        // Off the main thread: rendering reads SharedPreferences and parses the
+        // whole water log, and doing that inside onPause would put a disk read and
+        // a JSON parse on the critical path of the closing animation (and trip
+        // StrictMode). The application context, not the activity, because this
+        // outlives the activity it was started from.
+        val context = applicationContext
+        Thread {
+            try {
+                WaterWidgetProvider.refreshAll(context)
+                MedicineWidgetProvider.refreshAll(context)
+            } catch (error: Exception) {
+                // A launcher with no instances placed, or an unusual widget host,
+                // must not be able to take the app down over a cosmetic refresh.
+                Log.w("MainActivity", "Widget refresh failed", error)
+            }
+        }.start()
+    }
+
+    override fun onPause() {
+        // The most likely moment for the home screen to become visible is the app
+        // going away, so this is the cheapest place to guarantee the widget is
+        // current — it covers any write path that forgot to ask.
+        refreshWidgets()
+        super.onPause()
     }
 
     override fun onDestroy() {

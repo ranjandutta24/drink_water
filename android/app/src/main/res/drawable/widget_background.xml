@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The widget's own surface. Android 12 and up clips widgets to the launcher's own
+  corner radius, but 11 and down do not, so the shape is drawn here to keep the
+  card looking deliberate on older devices too. The radius is overridden in
+  values-v31 to line up with the system value where that exists.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_canvas" />
+    <corners android:radius="@dimen/widget_corner_radius" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/widget_hairline" />
+</shape>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The widget palette, kept in step with AppPalette.light in lib/theme.dart.
+
+  Duplicated as resource values rather than passed in from Dart because a widget
+  is rendered by the launcher from a RemoteViews tree, with the app process very
+  possibly dead — there is nobody to ask for a colour at that moment. The
+  values-night copy of this file mirrors AppPalette.dark, so the widget follows
+  the system dark setting the way the launcher around it does.
+-->
+<resources>
+    <color name="widget_canvas">#FFFFFFFF</color>
+    <color name="widget_hairline">#FFD9E2E5</color>
+    <color name="widget_ink">#FF0C2536</color>
+    <color name="widget_ink_soft">#FF5B6B77</color>
+    <color name="widget_aqua">#FF1B9AAA</color>
+    <color name="widget_aqua_wash">#FFE3F1F3</color>
+    <color name="widget_on_accent">#FFFFFFFF</color>
+    <color name="widget_kelp">#FF2A9D6E</color>
+    <color name="widget_clay">#FFC0563C</color>
+</resources>

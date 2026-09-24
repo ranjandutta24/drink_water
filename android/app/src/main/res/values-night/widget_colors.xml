@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mirrors AppPalette.dark in lib/theme.dart. Deliberately not an inversion of the
+  light set, for the same reason the app's dark theme is not: `panel` lifts away
+  from a near-black canvas, and the accent brightens so it still reads against it.
+-->
+<resources>
+    <color name="widget_canvas">#FF151E23</color>
+    <color name="widget_hairline">#FF283840</color>
+    <color name="widget_ink">#FFE8F0F3</color>
+    <color name="widget_ink_soft">#FF9CB0BA</color>
+    <color name="widget_aqua">#FF34B7C8</color>
+    <color name="widget_aqua_wash">#FF14313A</color>
+    <color name="widget_on_accent">#FF04171C</color>
+    <color name="widget_kelp">#FF4CC48E</color>
+    <color name="widget_clay">#FFE0806A</color>
+</resources>

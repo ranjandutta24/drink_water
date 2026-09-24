@@ -61,3 +61,18 @@
 # The background isolate writes the water/medicine log through this while the UI
 # is gone, so its Android side has to survive shrinking too.
 -keep class io.flutter.plugins.sharedpreferences.** { *; }
+
+# --- home screen widgets -----------------------------------------------------
+# All three receivers are named as strings in AndroidManifest.xml, so R8 keeps the
+# classes, but Android instantiates a receiver reflectively through its no-arg
+# constructor — so be explicit about the members too. Everything else here
+# (WidgetStore, the companions, the refresh helpers) is reached by ordinary calls
+# that R8 renames consistently, so those keeps are belt-and-braces rather than
+# load-bearing. Being explicit costs nothing and the failure mode is the bad kind:
+# a widget that renders once from initialLayout and then never updates, only in
+# release builds.
+-keep class com.example.drink_water.WaterWidgetProvider { *; }
+-keep class com.example.drink_water.MedicineWidgetProvider { *; }
+-keep class com.example.drink_water.WidgetActionReceiver { *; }
+-keep class com.example.drink_water.WidgetStore { *; }
+-keep class com.example.drink_water.WidgetStore$* { *; }

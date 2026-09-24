@@ -64,6 +64,56 @@
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
             android:exported="false"/>
+
+        <!-- Home screen widgets. Both providers must be exported: the launcher and
+             the system send APPWIDGET_UPDATE from outside this app, and an
+             unexported receiver would simply never be updated. Because exported
+             also means "any app can send this anything", the widget buttons go to
+             the unexported WidgetActionReceiver below instead.
+
+             Both widgets show "today", so they are wrong the instant the date
+             changes. TIME_SET and TIMEZONE_CHANGED cover a user changing the clock.
+             DATE_CHANGED is listed for completeness but should not be relied on: it
+             is not on Android 8's implicit-broadcast exemption list, so a
+             manifest-declared receiver very likely never sees it. The backstop for
+             the ordinary midnight rollover is updatePeriodMillis, which means the
+             totals can read up to half an hour stale just after midnight. -->
+        <receiver
+            android:name=".WaterWidgetProvider"
+            android:label="@string/widget_water_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="android.intent.action.DATE_CHANGED"/>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/appwidget_water"/>
+        </receiver>
+
+        <receiver
+            android:name=".MedicineWidgetProvider"
+            android:label="@string/widget_medicine_title"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="android.intent.action.DATE_CHANGED"/>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/appwidget_medicine"/>
+        </receiver>
+
+        <!-- The widget buttons. Not exported and with no intent-filter: it is only
+             ever reached by an explicit PendingIntent this app built, which is
+             exactly what keeps another app from logging a drink or a dose. -->
+        <receiver
+            android:name=".WidgetActionReceiver"
+            android:exported="false"/>
     </application>
 
     <queries>

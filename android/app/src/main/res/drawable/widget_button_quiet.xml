@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The second, larger amount. Tinted rather than filled so the two buttons are not
+  competing for the same attention, and so an accidental tap is likelier to land
+  on the smaller amount.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widget_aqua_wash" />
+    <corners android:radius="@dimen/widget_button_radius" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/widget_aqua" />
+</shape>

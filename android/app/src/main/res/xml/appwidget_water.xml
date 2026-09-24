@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Water widget metadata.
+
+  updatePeriodMillis is 30 minutes, which is also the floor Android enforces —
+  anything smaller is silently rounded up. It is a safety net rather than the main
+  refresh path: the app pushes an update as it goes to the background, and a tap on
+  the widget's own buttons redraws immediately. What the timer covers is a drink
+  logged from a notification while the app process is dead, where there is no
+  Flutter engine to push from — and the midnight rollover, since the DATE_CHANGED
+  broadcast is not something a manifest receiver can count on from Android 8.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_water"
+    android:previewLayout="@layout/widget_water"
+    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/widget_water_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />
