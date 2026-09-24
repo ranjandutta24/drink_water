@@ -8,6 +8,7 @@ import 'package:drink_water/services/notification_service.dart';
 import 'package:drink_water/services/report_service.dart';
 import 'package:drink_water/services/storage_service.dart'
     show themeModeFromName;
+import 'package:drink_water/services/timeline_service.dart';
 import 'package:drink_water/theme.dart';
 import 'package:drink_water/utils/format.dart';
 import 'package:flutter/material.dart';
@@ -533,6 +534,289 @@ void main() {
         AppPalette.dark.medicinePalette.length,
         AppPalette.light.medicinePalette.length,
       );
+    });
+  });
+
+  group('day timeline', () {
+    // A fixed day in the past, so "missed" and "upcoming" are decided by the
+    // injected clock rather than by when the suite happens to run.
+    final day = DateTime(2026, 3, 5);
+    DateTime at(int hour, [int minute = 0]) =>
+        DateTime(2026, 3, 5, hour, minute);
+
+    WaterEntry drink(int hour, int amountMl) => WaterEntry(
+      id: '$hour',
+      timestamp: at(hour),
+      amountMl: amountMl,
+    );
+
+    final pill = Medicine(
+      id: 'm1',
+      name: 'Vitamin D',
+      weekdays: const {1, 2, 3, 4, 5, 6, 7},
+      times: const [TimeOfDay(hour: 8, minute: 0)],
+    );
+
+    test('water events carry a running total and come out in clock order', () {
+      final timeline = TimelineService(
+        entries: [drink(14, 300), drink(9, 250)],
+        intakes: const [],
+        medicines: const [],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final water = timeline.events.cast<WaterEvent>();
+      expect(water.map((event) => event.at.hour).toList(), [9, 14]);
+      expect(water.map((event) => event.runningTotalMl).toList(), [250, 550]);
+      expect(timeline.waterTotalMl, 550);
+      expect(timeline.drinkCount, 2);
+    });
+
+    test('an intake inside the grace window claims its scheduled slot', () {
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [MedicineIntake(medicineId: 'm1', timestamp: at(9, 40))],
+        medicines: [pill],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final dose = timeline.events.single as DoseEvent;
+      expect(dose.status, DoseStatus.taken);
+      // Sorted by the scheduled time, not the time it was logged.
+      expect(dose.at, at(8));
+      expect(dose.driftMinutes, 100);
+      expect(timeline.dosesTaken, 1);
+      expect(timeline.dosesMissed, 0);
+    });
+
+    test('an intake beyond the grace window is an extra dose', () {
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [MedicineIntake(medicineId: 'm1', timestamp: at(20))],
+        medicines: [pill],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final statuses = timeline.events
+          .cast<DoseEvent>()
+          .map((dose) => dose.status)
+          .toList();
+      // The 08:00 slot went unclaimed and the 20:00 log stands on its own.
+      expect(statuses, [DoseStatus.missed, DoseStatus.extra]);
+      expect(timeline.dosesScheduled, 1);
+      expect(timeline.dosesMissed, 1);
+    });
+
+    test('a slot whose time has not arrived is upcoming, not missed', () {
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: const [],
+        medicines: [pill],
+        goalMl: 2000,
+      ).forDay(day, now: at(6));
+
+      expect(
+        (timeline.events.single as DoseEvent).status,
+        DoseStatus.upcoming,
+      );
+      expect(timeline.dosesMissed, 0);
+    });
+
+    test('two intakes take the nearest free slot each', () {
+      final twice = Medicine(
+        id: 'm2',
+        name: 'Antibiotic',
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        times: const [
+          TimeOfDay(hour: 8, minute: 0),
+          TimeOfDay(hour: 20, minute: 0),
+        ],
+      );
+
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(medicineId: 'm2', timestamp: at(20, 30)),
+          MedicineIntake(medicineId: 'm2', timestamp: at(8, 10)),
+        ],
+        medicines: [twice],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final doses = timeline.events.cast<DoseEvent>();
+      expect(doses.map((dose) => dose.status).toList(), [
+        DoseStatus.taken,
+        DoseStatus.taken,
+      ]);
+      expect(doses.map((dose) => dose.driftMinutes).toList(), [10, 30]);
+    });
+
+    test('a disabled medicine schedules nothing but still shows a log', () {
+      final off = Medicine(
+        id: 'm3',
+        name: 'Old prescription',
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        times: const [TimeOfDay(hour: 8, minute: 0)],
+        enabled: false,
+      );
+
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [MedicineIntake(medicineId: 'm3', timestamp: at(8, 5))],
+        medicines: [off],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      expect(timeline.dosesScheduled, 0);
+      expect(
+        (timeline.events.single as DoseEvent).status,
+        DoseStatus.extra,
+      );
+    });
+
+    test('a skipped dose counts as due but not as taken', () {
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(
+            medicineId: 'm1',
+            timestamp: at(8, 5),
+            skipped: true,
+          ),
+        ],
+        medicines: [pill],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      expect(
+        (timeline.events.single as DoseEvent).status,
+        DoseStatus.skipped,
+      );
+      expect(timeline.dosesTaken, 0);
+      expect(timeline.dosesMissed, 0);
+    });
+
+    test('adherence over a range only counts slots that came due', () {
+      final service = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(medicineId: 'm1', timestamp: DateTime(2026, 3, 5, 8)),
+          MedicineIntake(medicineId: 'm1', timestamp: DateTime(2026, 3, 6, 8)),
+        ],
+        medicines: [pill],
+        goalMl: 2000,
+      );
+
+      // Three days of slots, but the clock stops on the 7th at 06:00 — before
+      // that day's 08:00 dose — so only two have come due.
+      final rows = service.adherenceBetween(
+        DateTime(2026, 3, 5),
+        DateTime(2026, 3, 7),
+        now: DateTime(2026, 3, 7, 6),
+      );
+
+      expect(rows.single.scheduled, 3);
+      expect(rows.single.due, 2);
+      expect(rows.single.taken, 2);
+      expect(rows.single.rate, 1.0);
+    });
+
+    test('a dose skipped off the plan stays out of the adherence rate', () {
+      // Due Mondays only, so nothing is scheduled on this Thursday — but the
+      // user logged it as skipped anyway. That must not invent a slot, or the
+      // PDF would report a scheduled dose the day view never showed.
+      final mondays = Medicine(
+        id: 'm3',
+        name: 'Weekly tablet',
+        weekdays: const {1},
+        times: const [TimeOfDay(hour: 8, minute: 0)],
+      );
+      final service = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(
+            medicineId: 'm3',
+            timestamp: at(8, 5),
+            skipped: true,
+          ),
+        ],
+        medicines: [mondays],
+        goalMl: 2000,
+      );
+
+      final timeline = service.forDay(day, now: at(23));
+      final dose = timeline.events.whereType<DoseEvent>().single;
+      expect(dose.status, DoseStatus.skipped);
+      expect(dose.isScheduled, isFalse);
+      expect(dose.driftMinutes, isNull);
+      expect(timeline.dosesScheduled, 0);
+
+      final row = service
+          .adherenceBetween(day, day, now: at(23))
+          .single;
+      expect(row.scheduled, 0);
+      expect(row.skipped, 0);
+      expect(row.extra, 1);
+      expect(row.due, 0);
+      expect(row.rate, 0);
+    });
+
+    test('a day with nothing on it is empty', () {
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: const [],
+        medicines: const [],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      expect(timeline.isEmpty, isTrue);
+      expect(timeline.progress, 0);
+      expect(timeline.remainingMl, 2000);
+    });
+  });
+
+  group('calendar month report', () {
+    test('reports an arbitrary month by its anchor', () {
+      final service = ReportService(
+        entries: [
+          WaterEntry(
+            id: 'a',
+            timestamp: DateTime(2026, 2, 14, 10),
+            amountMl: 2500,
+          ),
+        ],
+        goalMl: 2000,
+      );
+
+      final report = service.monthReportFor(DateTime(2026, 2, 1));
+
+      // 2026 is not a leap year, so February is 28 days.
+      expect(report.days.length, 28);
+      expect(report.start, DateTime(2026, 2, 1));
+      expect(report.end, DateTime(2026, 2, 28));
+      expect(report.label, 'February 2026');
+      expect(report.totalMl, 2500);
+      expect(report.days[13].goalMet, isTrue);
+    });
+
+    test('the current month is labelled instead of named', () {
+      final now = DateTime.now();
+      final report = const ReportService(
+        entries: [],
+        goalMl: 2000,
+      ).monthReportFor(DateTime(now.year, now.month, 1));
+
+      expect(report.label, 'This month');
+      expect(report.days.length, DateTime(now.year, now.month + 1, 0).day);
+    });
+
+    test('a leap February gets its extra day', () {
+      final report = const ReportService(
+        entries: [],
+        goalMl: 2000,
+      ).monthReportFor(DateTime(2024, 2, 1));
+
+      expect(report.days.length, 29);
     });
   });
 }

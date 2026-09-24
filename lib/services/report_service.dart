@@ -93,6 +93,11 @@ class ReportService {
     return totals;
   }
 
+  /// Day key → millilitres. Exposed for callers that look up many days in one
+  /// pass: the calendar grid asks about 42 of them per rebuild, and going
+  /// through [totalForDay] would re-fold the whole log each time.
+  Map<String, int> get totalsByDay => _totalsByDay;
+
   int totalForDay(DateTime date) =>
       _totalsByDay[WaterEntry.dayKeyFor(date)] ?? 0;
 
@@ -131,9 +136,16 @@ class ReportService {
   /// Calendar month. [monthsAgo] 0 is the current month.
   PeriodReport monthReport({int monthsAgo = 0}) {
     final now = DateTime.now();
-    final anchor = DateTime(now.year, now.month - monthsAgo, 1);
+    return monthReportFor(DateTime(now.year, now.month - monthsAgo, 1));
+  }
+
+  /// Calendar month containing [anchor]. The calendar view browses by absolute
+  /// month rather than an offset from today, so it needs this form.
+  PeriodReport monthReportFor(DateTime anchor) {
     final daysInMonth = DateTime(anchor.year, anchor.month + 1, 0).day;
     final totals = _totalsByDay;
+    final now = DateTime.now();
+    final isCurrentMonth = anchor.year == now.year && anchor.month == now.month;
 
     final days = List.generate(daysInMonth, (index) {
       final date = DateTime(anchor.year, anchor.month, index + 1);
@@ -145,7 +157,7 @@ class ReportService {
     });
 
     return PeriodReport(
-      label: monthsAgo == 0 ? 'This month' : _monthName(anchor),
+      label: isCurrentMonth ? 'This month' : _monthName(anchor),
       start: anchor,
       end: DateTime(anchor.year, anchor.month, daysInMonth),
       days: days,

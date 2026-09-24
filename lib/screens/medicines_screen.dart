@@ -5,6 +5,7 @@ import '../models/time_of_day_x.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/shell_nav.dart';
 import 'medicine_editor_screen.dart';
 
 class MedicinesScreen extends StatelessWidget {
@@ -19,6 +20,7 @@ class MedicinesScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const NavMenuButton(),
         title: const Text('Medicines'),
         actions: [
           if (medicines.isNotEmpty)

@@ -385,26 +385,19 @@ ThemeData _buildTheme(AppPalette palette, Brightness brightness, AppFont font) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(foregroundColor: palette.aqua),
     ),
-    navigationBarTheme: NavigationBarThemeData(
+    // Navigation is the side drawer; there is no bottom bar to theme.
+    drawerTheme: DrawerThemeData(
       backgroundColor: palette.panel,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: palette.aquaWash,
-      height: 68,
-      labelTextStyle: WidgetStatePropertyAll(
-        TextStyle(
-          fontFamily: family,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: palette.ink,
+      width: 300,
+      // Directional so the rounded edge stays on the inner side of the sheet
+      // rather than always the right one.
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadiusDirectional.horizontal(
+          end: Radius.circular(22),
         ),
       ),
-      iconTheme: WidgetStateProperty.resolveWith(
-        (states) => IconThemeData(
-          color: states.contains(WidgetState.selected)
-              ? palette.aquaDeep
-              : palette.inkSoft,
-        ),
-      ),
+      scrimColor: Colors.black.withValues(alpha: 0.42),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: brightness == Brightness.light

@@ -2,11 +2,15 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../models/water_settings.dart';
+import '../services/file_share_service.dart';
+import '../services/pdf_report_service.dart';
 import '../services/report_service.dart';
+import '../services/timeline_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import '../widgets/shell_nav.dart';
 
 enum _Range { week, month }
 
@@ -23,6 +27,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   /// 0 = current period, 1 = previous, and so on.
   int _offset = 0;
 
+  bool _exporting = false;
+
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
@@ -36,7 +42,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : service.monthReport(monthsAgo: _offset);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reports')),
+      appBar: AppBar(
+        leading: const NavMenuButton(),
+        title: const Text('Reports'),
+        actions: [
+          if (_exporting)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              tooltip: 'Export as PDF',
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              // Exports whatever period is on screen, so the arrows above double
+              // as the period picker for the PDF too.
+              onPressed: () => _offerExport(report),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 36),
         children: [
@@ -114,7 +144,110 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
     return '${report.days.length} days';
   }
+
+  // --- PDF export -----------------------------------------------------------
+
+  Future<void> _offerExport(PeriodReport report) async {
+    final palette = AppColors.of(context);
+    final choice = await showModalBottomSheet<_ExportChoice>(
+      context: context,
+      backgroundColor: palette.panel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            SectionHeader(title: '${report.label} as a PDF'),
+            ListTile(
+              leading: const Icon(Icons.share_outlined),
+              title: const Text('Share'),
+              subtitle: const Text('Send it to another app'),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_ExportChoice.share),
+            ),
+            ListTile(
+              leading: const Icon(Icons.save_alt),
+              title: const Text('Save to a folder'),
+              subtitle: const Text('Pick where the file goes'),
+              onTap: () => Navigator.of(sheetContext).pop(_ExportChoice.save),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+    await _exportPdf(report, choice);
+  }
+
+  Future<void> _exportPdf(PeriodReport report, _ExportChoice choice) async {
+    final state = AppScope.read(context);
+    setState(() => _exporting = true);
+    try {
+      // The same TimelineService the dashboard uses, so the adherence figures in
+      // the PDF match what the day view showed.
+      final adherence = TimelineService(
+        entries: state.waterLog,
+        intakes: state.medicineLog,
+        medicines: state.medicines,
+        goalMl: state.settings.dailyGoalMl,
+      ).adherenceBetween(report.start, report.end);
+
+      final bytes = await PdfReportService.build(
+        report: report,
+        settings: state.settings,
+        adherence: adherence,
+        currentStreak: ReportService(
+          entries: state.waterLog,
+          goalMl: state.settings.dailyGoalMl,
+        ).currentStreak,
+      );
+      final fileName = PdfReportService.suggestedFileName(report);
+
+      if (choice == _ExportChoice.share) {
+        await FileShareService.share(
+          bytes,
+          fileName,
+          subject: 'Hydration report — ${report.label}',
+        );
+        return;
+      }
+
+      final outcome = await FileShareService.save(
+        bytes,
+        fileName,
+        dialogTitle: 'Save your report',
+      );
+      if (!mounted) return;
+      switch (outcome.status) {
+        case SaveStatus.saved:
+          _snack('Report saved as $fileName');
+        case SaveStatus.savedToAppFolder:
+          _snack('Saved inside the app folder: ${outcome.path}');
+        case SaveStatus.cancelled:
+          break;
+        case SaveStatus.failed:
+          _snack('Could not save the report. (${outcome.error})');
+      }
+    } catch (error) {
+      if (mounted) _snack('Could not build the report. ($error)');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 }
+
+enum _ExportChoice { share, save }
 
 class _PeriodNav extends StatelessWidget {
   const _PeriodNav({

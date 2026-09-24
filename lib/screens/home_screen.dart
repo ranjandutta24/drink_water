@@ -11,6 +11,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import '../widgets/shell_nav.dart';
 import '../widgets/water_vessel.dart';
 import 'water_settings_screen.dart';
 
@@ -104,47 +105,62 @@ class _Greeting extends StatelessWidget {
         ? 'Good afternoon'
         : 'Good evening';
 
-    return Row(
+    // This screen has no AppBar — the greeting *is* the header — so the drawer
+    // handle gets a row of its own above the text. Putting it beside the
+    // greeting instead would indent that one line away from the left margin
+    // every other row on the page lines up on.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(greeting, style: Theme.of(context).textTheme.titleLarge),
-              Text(
-                formatDayLabel(DateTime.now()),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
+        Row(
+          children: [
+            Transform.translate(
+              offset: const Offset(-10, 0),
+              child: const NavMenuButton(dense: true),
+            ),
+            const Spacer(),
+            if (streak > 0) _StreakChip(streak: streak),
+          ],
         ),
-        if (streak > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppColors.of(context).aquaWash,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.bolt,
-                  size: 16,
-                  color: AppColors.of(context).aquaDeep,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$streak day${streak == 1 ? '' : 's'} on goal',
-                  style: TextStyle(
-                    color: AppColors.of(context).aquaDeep,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
+        const SizedBox(height: 4),
+        Text(greeting, style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          formatDayLabel(DateTime.now()),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _StreakChip extends StatelessWidget {
+  const _StreakChip({required this.streak});
+
+  final int streak;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: palette.aquaWash,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.bolt, size: 16, color: palette.aquaDeep),
+          const SizedBox(width: 4),
+          Text(
+            '$streak day${streak == 1 ? '' : 's'} on goal',
+            style: TextStyle(
+              color: palette.aquaDeep,
+              fontWeight: FontWeight.w600,
+              fontSize: 12.5,
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }

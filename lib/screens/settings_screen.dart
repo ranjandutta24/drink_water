@@ -11,6 +11,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import '../widgets/shell_nav.dart';
 
 /// Appearance, plus export and import of the whole configuration as one JSON
 /// file. Nothing leaves the device unless the user picks a destination
@@ -31,7 +32,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = state.settings;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        leading: const NavMenuButton(),
+        title: const Text('Settings'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 36),
         children: [

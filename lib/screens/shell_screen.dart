@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/shell_nav.dart';
+import 'dashboard_screen.dart';
 import 'home_screen.dart';
 import 'medicines_screen.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
 
-/// Four destinations, each a full screen. Kept alive so the reports keep their
-/// selected period while the user checks something else.
+/// Five destinations reached from the side drawer, each a full screen. All of
+/// them stay alive so the reports keep their selected period — and the dashboard
+/// its selected day — while the user checks something else.
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
 
@@ -17,11 +21,14 @@ class ShellScreen extends StatefulWidget {
 
 class _ShellScreenState extends State<ShellScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
-  int _index = 0;
-  int _leaving = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  /// Drives the tab change. Starts at 1 — completed — so the first frame shows
-  /// the water screen fully settled rather than fading in.
+  ShellDestination _current = ShellDestination.dashboard;
+  ShellDestination _leaving = ShellDestination.dashboard;
+  bool _drawerOpen = false;
+
+  /// Drives the destination change. Starts at 1 — completed — so the first frame
+  /// shows the dashboard fully settled rather than fading in.
   late final AnimationController _transition = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
@@ -43,7 +50,10 @@ class _ShellScreenState extends State<ShellScreen>
     ),
   );
 
+  /// Index order matches [ShellDestination.values], which is what makes
+  /// `destination.index` a valid slot number.
   static const List<Widget> _pages = [
+    DashboardScreen(),
     HomeScreen(),
     MedicinesScreen(),
     ReportsScreen(),
@@ -58,9 +68,9 @@ class _ShellScreenState extends State<ShellScreen>
     // to being a hidden, ticker-less slot instead of animating out of sight.
     _transition.addStatusListener((status) {
       if (status == AnimationStatus.completed &&
-          _leaving != _index &&
+          _leaving != _current &&
           mounted) {
-        setState(() => _leaving = _index);
+        setState(() => _leaving = _current);
       }
     });
   }
@@ -72,13 +82,35 @@ class _ShellScreenState extends State<ShellScreen>
     super.dispose();
   }
 
-  void _select(int value) {
-    if (value == _index) return;
+  void _go(ShellDestination value) {
+    if (value == _current) return;
     setState(() {
-      _leaving = _index;
-      _index = value;
+      _leaving = _current;
+      _current = value;
     });
     _transition.forward(from: 0);
+  }
+
+  void _openDrawer() => _scaffoldKey.currentState?.openDrawer();
+
+  /// Android back. With no bottom bar there is nothing on screen that says "you
+  /// are one step away from home", so back returns to the dashboard first and
+  /// only leaves the app from there.
+  void _handleBack(bool didPop, Object? result) {
+    if (didPop) return;
+
+    // An open drawer registers a pop handler of its own, so a back press can
+    // reach both it and this one. Either flag being set means the press belongs
+    // to the drawer, not to navigation — checking both makes the outcome
+    // independent of which handler the framework runs first. closeDrawer is
+    // idempotent, so it is safe even if the drawer already acted.
+    final state = _scaffoldKey.currentState;
+    if (_drawerOpen || (state?.isDrawerOpen ?? false)) {
+      state?.closeDrawer();
+      return;
+    }
+
+    _go(ShellDestination.dashboard);
   }
 
   @override
@@ -92,10 +124,10 @@ class _ShellScreenState extends State<ShellScreen>
   /// One page of the stack, wrapped in whatever it needs to be shown, hidden, or
   /// animated in or out.
   Widget _slot(int i) {
-    final isCurrent = i == _index;
-    final isLeaving = i == _leaving && _leaving != _index;
+    final isCurrent = i == _current.index;
+    final isLeaving = i == _leaving.index && _leaving != _current;
 
-    // TickerMode stops off-screen tabs from driving animations (and from
+    // TickerMode stops off-screen pages from driving animations (and from
     // repainting). Without it the carafe would keep sloshing in the background
     // forever. The leaving page keeps its ticker until the fade is over so it
     // does not visibly freeze on the way out.
@@ -126,40 +158,32 @@ class _ShellScreenState extends State<ShellScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // A Stack rather than an IndexedStack so two pages can be on screen
-      // together mid-transition. Every page still gets laid out on every frame,
-      // exactly as IndexedStack did, which is what keeps scroll offsets and
-      // form state intact; the hidden ones are simply never painted.
-      body: Stack(
-        fit: StackFit.expand,
-        children: [for (var i = 0; i < _pages.length; i++) _slot(i)],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _select,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.water_drop_outlined),
-            selectedIcon: Icon(Icons.water_drop),
-            label: 'Water',
+    return PopScope(
+      canPop: _current == ShellDestination.dashboard && !_drawerOpen,
+      onPopInvokedWithResult: _handleBack,
+      // Above the Scaffold so the drawer itself can read the current
+      // destination and highlight the right row.
+      child: ShellNav(
+        current: _current,
+        go: _go,
+        openDrawer: _openDrawer,
+        child: Scaffold(
+          key: _scaffoldKey,
+          drawer: const AppDrawer(),
+          // Tracked only so back can close the drawer instead of leaving the app.
+          onDrawerChanged: (isOpen) {
+            if (isOpen != _drawerOpen) setState(() => _drawerOpen = isOpen);
+          },
+          // A Stack rather than an IndexedStack so two pages can be on screen
+          // together mid-transition. Every page still gets laid out on every
+          // frame, exactly as IndexedStack did, which is what keeps scroll
+          // offsets and form state intact; the hidden ones are simply never
+          // painted.
+          body: Stack(
+            fit: StackFit.expand,
+            children: [for (var i = 0; i < _pages.length; i++) _slot(i)],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.medication_outlined),
-            selectedIcon: Icon(Icons.medication),
-            label: 'Medicines',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: 'Reports',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+        ),
       ),
     );
   }
