@@ -497,6 +497,43 @@ void main() {
       // Typography, which names a family (Roboto on Android) regardless.
       expect(AppFont.system.family, isNull);
     });
+
+    test('every offered font round-trips through its stored name', () {
+      // The enum name is what lands in SharedPreferences and in backups, so a
+      // rename is a silent data migration. This catches one going unnoticed.
+      for (final font in AppFont.values) {
+        expect(appFontFromName(font.name), font, reason: font.label);
+      }
+    });
+
+    test('the four added families name themselves exactly', () {
+      // These strings have to match the `family:` keys in pubspec.yaml letter
+      // for letter, spaces included, or Flutter quietly serves the fallback.
+      expect(AppFont.inter.family, 'Inter');
+      expect(AppFont.plusJakarta.family, 'Plus Jakarta Sans');
+      expect(AppFont.manrope.family, 'Manrope');
+      expect(AppFont.poppins.family, 'Poppins');
+      expect(
+        buildDarkTheme(AppFont.poppins).textTheme.bodyMedium?.fontFamily,
+        'Poppins',
+      );
+    });
+
+    test('no two fonts offer the same family or the same label', () {
+      final families = AppFont.values
+          .map((font) => font.family)
+          .whereType<String>()
+          .toList();
+      final labels = AppFont.values.map((font) => font.label).toList();
+
+      expect(families.toSet().length, families.length);
+      expect(labels.toSet().length, labels.length);
+      // A row with no explanation under it reads as unfinished.
+      expect(
+        AppFont.values.every((font) => font.note.trim().isNotEmpty),
+        isTrue,
+      );
+    });
   });
 
   group('theme', () {

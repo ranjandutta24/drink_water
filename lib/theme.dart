@@ -205,13 +205,31 @@ class AppColors {
 
 /// The typefaces offered in Settings.
 ///
-/// Play is bundled from assets/fonts; the rest are families Android already has
-/// on disk. Either way nothing is downloaded at runtime. [family] is passed
-/// straight to Flutter as a font family name, and null means "whatever the
-/// platform's default is", which on Android is Roboto.
+/// Play and Poppins are bundled from assets/fonts; the rest are families Android
+/// already has on disk. Either way nothing is downloaded at runtime — no
+/// `google_fonts`, so the picker works on a phone in aeroplane mode.
+/// [family] is passed straight to Flutter as a font family name, and null means
+/// "whatever the platform's default is", which on Android is Roboto.
+///
+/// Plus Jakarta Sans, Inter and Manrope are listed here but their files are not
+/// in the repo yet (see assets/fonts/README.md). A family Flutter cannot find
+/// falls back to the platform font instead of throwing, so listing them early
+/// costs nothing and each picker row previews itself, which is how you can see
+/// at a glance which ones are live.
+///
+/// Order is the order of the picker: the phone's own font first, then the sans
+/// faces, then the two with a deliberate character to them.
 enum AppFont {
   system('Default', null, 'The font your phone uses everywhere else'),
   roboto('Roboto', 'Roboto', "Android's own typeface — clean and neutral"),
+  inter('Inter', 'Inter', 'Built for screens — tight, even, very legible'),
+  plusJakarta(
+    'Plus Jakarta Sans',
+    'Plus Jakarta Sans',
+    'Geometric with a friendly tilt to it',
+  ),
+  manrope('Manrope', 'Manrope', 'Rounded and open — softer at small sizes'),
+  poppins('Poppins', 'Poppins', 'Circular letterforms, roomy and modern'),
   play('Play', 'Play', 'Squared-off and a little technical'),
   mono('Mono', 'monospace', 'Fixed width — every digit lines up');
 
