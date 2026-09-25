@@ -66,22 +66,17 @@ class MedicineWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.medicine_name, next.name)
                 views.setTextViewText(R.id.medicine_time, describe(context, next))
 
-                // The button only appears when a tap would visibly do something.
-                // Logging stamps the intake at the moment of the tap — the same as
-                // everywhere else in the app — so marking a dose that is still five
-                // hours off records an intake too far from the slot to settle it: the
-                // count would not move and the widget would redraw unchanged, which
-                // reads as a broken button rather than as a rule.
-                val reachable = kotlin.math.abs(minutesUntil(next)) <= WidgetStore.GRACE_MINUTES
-                if (reachable) {
-                    views.setViewVisibility(R.id.medicine_taken, View.VISIBLE)
-                    views.setOnClickPendingIntent(
-                        R.id.medicine_taken,
-                        takenIntent(context, next.medicineId),
-                    )
-                } else {
-                    views.setViewVisibility(R.id.medicine_taken, View.GONE)
-                }
+                // Always offered, however far off the dose is. The intake records
+                // the slot it answers, so the tap settles this dose whatever the
+                // clock says. It used to be hidden outside a three-hour window,
+                // because back then logging stamped only the moment of the tap and
+                // a dose five hours away could not be reached — that limitation is
+                // gone, and hiding the button was only ever a way of admitting it.
+                views.setViewVisibility(R.id.medicine_taken, View.VISIBLE)
+                views.setOnClickPendingIntent(
+                    R.id.medicine_taken,
+                    takenIntent(context, next.medicineId, next.minuteOfDay),
+                )
             }
 
             views.setOnClickPendingIntent(R.id.medicine_root, launchIntent(context))
@@ -147,12 +142,17 @@ class MedicineWidgetProvider : AppWidgetProvider() {
             return DateFormat.getTimeFormat(context).format(at.time)
         }
 
-        private fun takenIntent(context: Context, medicineId: String): PendingIntent {
+        private fun takenIntent(
+            context: Context,
+            medicineId: String,
+            slotMinute: Int,
+        ): PendingIntent {
             // Aimed at the unexported [WidgetActionReceiver], so another app cannot
             // write a dose into the log by forging this broadcast.
             val intent = Intent(context, WidgetActionReceiver::class.java).apply {
                 action = WidgetActionReceiver.ACTION_DOSE_TAKEN
                 putExtra(WidgetActionReceiver.EXTRA_MEDICINE_ID, medicineId)
+                putExtra(WidgetActionReceiver.EXTRA_SLOT_MINUTE, slotMinute)
             }
             return PendingIntent.getBroadcast(
                 context,

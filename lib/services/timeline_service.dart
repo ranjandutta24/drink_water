@@ -149,13 +149,14 @@ class AdherenceRow {
 
 /// Merges the water log and the medicine schedule into a single day view.
 ///
-/// The interesting part is reconciling *planned* doses with *logged* ones. The
-/// log only records "this medicine was taken at this instant", with no reference
-/// to which of the day's scheduled slots it belonged to, so the pairing has to be
-/// inferred: each logged intake is attached to the nearest unclaimed slot for
-/// that medicine. Anything left over is reported as [DoseStatus.extra] rather
-/// than being hidden, and any slot still unclaimed is upcoming or missed
-/// depending on whether its time has passed.
+/// The interesting part is reconciling *planned* doses with *logged* ones.
+/// A dose logged from the app or a notification records the slot it was meant
+/// for in [MedicineIntake.scheduledFor], and that pairing is honoured exactly.
+/// Anything without one — an off-plan dose, or a record from a build before the
+/// field existed — is attached to the nearest unclaimed slot within
+/// [graceWindow] instead. Anything still left over is reported as
+/// [DoseStatus.extra] rather than being hidden, and any slot nothing claimed is
+/// upcoming or missed depending on whether its time has passed.
 class TimelineService {
   const TimelineService({
     required this.entries,
@@ -206,7 +207,8 @@ class TimelineService {
           intakes
               .where(
                 (intake) =>
-                    intake.medicineId == medicine.id && intake.dayKey == dayKey,
+                    intake.medicineId == medicine.id &&
+                    intake.planDayKey == dayKey,
               )
               .toList()
             ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
@@ -225,7 +227,22 @@ class TimelineService {
       final claimed = List<MedicineIntake?>.filled(slotTimes.length, null);
       final leftovers = <MedicineIntake>[];
 
+      // Two passes, and the order matters. A dose the user marked against a
+      // named slot owns that slot outright, however late the tap was — tapping
+      // the 08:00 row at 15:00 means "I took the 08:00 one", and guessing from
+      // the clock would instead leave 08:00 missed and invent an extra dose.
+      // Only doses with no slot recorded fall back to guessing.
+      final unattached = <MedicineIntake>[];
       for (final intake in logged) {
+        final index = _exactSlot(slotTimes, claimed, intake);
+        if (index == null) {
+          unattached.add(intake);
+        } else {
+          claimed[index] = intake;
+        }
+      }
+
+      for (final intake in unattached) {
         final index = _nearestFreeSlot(slotTimes, claimed, intake.timestamp);
         if (index == null) {
           leftovers.add(intake);
@@ -371,6 +388,22 @@ class TimelineService {
   }
 
   static int _tieBreak(TimelineEvent event) => event is WaterEvent ? 0 : 1;
+
+  /// Index of the still-free slot this intake was explicitly logged against, or
+  /// null when it named no slot, named one this day no longer has (the times
+  /// were edited after the fact), or named one another dose already took.
+  static int? _exactSlot(
+    List<DateTime> slots,
+    List<MedicineIntake?> claimed,
+    MedicineIntake intake,
+  ) {
+    if (intake.scheduledFor == null) return null;
+    for (var i = 0; i < slots.length; i++) {
+      if (claimed[i] != null) continue;
+      if (intake.claims(slots[i])) return i;
+    }
+    return null;
+  }
 
   /// Index of the unclaimed slot closest to [when], or null if none is within
   /// [graceWindow]. Ties go to the earlier slot.

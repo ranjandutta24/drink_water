@@ -27,6 +27,13 @@ class WidgetActionReceiver : BroadcastReceiver() {
         const val ACTION_DOSE_TAKEN = "com.example.drink_water.WIDGET_DOSE_TAKEN"
         const val EXTRA_AMOUNT = "amountMl"
         const val EXTRA_MEDICINE_ID = "medicineId"
+
+        /**
+         * Minute of day of the dose being answered. A dose has to say which slot
+         * it settles, or a medicine due several times a day cannot tell its own
+         * doses apart. -1 means none was known.
+         */
+        const val EXTRA_SLOT_MINUTE = "slotMinute"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -37,7 +44,8 @@ class WidgetActionReceiver : BroadcastReceiver() {
             }
             ACTION_DOSE_TAKEN -> {
                 val id = intent.getStringExtra(EXTRA_MEDICINE_ID)
-                if (!id.isNullOrEmpty()) WidgetStore.recordTaken(context, id)
+                val slot = intent.getIntExtra(EXTRA_SLOT_MINUTE, -1)
+                if (!id.isNullOrEmpty()) WidgetStore.recordTaken(context, id, slot)
             }
             // Anything else is not ours; nothing to do, and nothing to redraw.
             else -> return

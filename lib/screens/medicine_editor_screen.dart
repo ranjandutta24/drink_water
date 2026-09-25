@@ -345,12 +345,23 @@ class _MedicineEditorScreenState extends State<MedicineEditorScreen> {
   }
 
   Future<void> _confirmDelete() async {
+    // Counted before the dialog opens so the warning can be specific. A dose
+    // record only carries a medicine id, so it becomes unreadable the moment the
+    // medicine goes — keeping the history was never really an option, and this
+    // used to promise otherwise.
+    final logged = AppScope.read(context).loggedDoseCount(widget.existing!.id);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Delete ${widget.existing?.name}?'),
-        content: const Text(
-          'Its reminders will be cancelled. Past doses stay in your history.',
+        content: Text(
+          logged == 0
+              ? 'Its reminders will be cancelled. Nothing has been logged '
+                    'against it yet.'
+              : 'Its reminders will be cancelled and the $logged '
+                    '${logged == 1 ? 'dose' : 'doses'} logged against it will be '
+                    'deleted from your history. This cannot be undone.',
         ),
         actions: [
           TextButton(

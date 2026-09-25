@@ -13,15 +13,21 @@ class DayTimelineView extends StatelessWidget {
     required this.timeline,
     required this.settings,
     this.onMarkTaken,
+    this.onSkip,
   });
 
   final DayTimeline timeline;
   final WaterSettings settings;
 
-  /// Offered only for today: `AppState.recordMedicineTaken` stamps the intake
-  /// with `DateTime.now()`, so there is no honest way to tick off a dose that
-  /// was due last Tuesday.
+  /// Offered only for today. Back-filling a day that has already closed is a
+  /// separate decision from logging the dose in front of you, so the day view
+  /// deliberately stays read-only once the date has passed.
   final void Function(DoseEvent dose)? onMarkTaken;
+
+  /// Records the dose as deliberately skipped. Worth distinguishing from simply
+  /// not logging it: a skipped dose and a forgotten one look identical in the
+  /// history otherwise, and only one of them is a lapse.
+  final void Function(DoseEvent dose)? onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +48,7 @@ class DayTimelineView extends StatelessWidget {
             settings: settings,
             isLast: i == events.length - 1,
             onMarkTaken: onMarkTaken,
+            onSkip: onSkip,
           ),
       ],
     );
@@ -54,12 +61,14 @@ class _TimelineRow extends StatelessWidget {
     required this.settings,
     required this.isLast,
     required this.onMarkTaken,
+    required this.onSkip,
   });
 
   final TimelineEvent event;
   final WaterSettings settings;
   final bool isLast;
   final void Function(DoseEvent dose)? onMarkTaken;
+  final void Function(DoseEvent dose)? onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -133,24 +142,48 @@ class _TimelineRow extends StatelessWidget {
         );
 
       case DoseEvent dose:
+        // Only a slot still waiting for an answer gets buttons, and only on a
+        // day the caller allows them. An unscheduled dose has no slot to settle.
+        final open =
+            dose.isScheduled &&
+            (dose.status == DoseStatus.upcoming ||
+                dose.status == DoseStatus.missed);
+
         return Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(dose.medicine.name, style: titleStyle),
+                  Text(
+                    dose.medicine.name,
+                    style: titleStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   Text(_doseNote(dose), style: noteStyle),
                 ],
               ),
             ),
-            if (onMarkTaken != null &&
-                (dose.status == DoseStatus.upcoming ||
-                    dose.status == DoseStatus.missed))
+            if (open && onSkip != null)
+              TextButton(
+                onPressed: () => onSkip!(dose),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  // Not the destructive clay: skipping on purpose is a valid
+                  // answer, not a mistake, so it reads as the quieter of the
+                  // two rather than as a warning.
+                  foregroundColor: palette.inkSoft,
+                ),
+                child: const Text('Skip'),
+              ),
+            if (open && onMarkTaken != null)
               TextButton(
                 onPressed: () => onMarkTaken!(dose),
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   foregroundColor: palette.aquaDeep,
                 ),
                 child: const Text('Taken'),

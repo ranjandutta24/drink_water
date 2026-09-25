@@ -673,9 +673,19 @@ class _MedicinePanel extends StatelessWidget {
       report.end.day,
     ).add(const Duration(days: 1));
 
+    // Joined against the surviving medicines so a record whose medicine is gone
+    // is not counted here while the day view, which walks the medicine list, has
+    // no row for it — the same period could otherwise show two different totals
+    // on two screens. Deleting a medicine now takes its doses with it, so this
+    // only matters for installs that already had orphans.
+    final known = {for (final medicine in state.medicines) medicine.id};
     final inPeriod = state.medicineLog.where(
       (intake) =>
-          intake.timestamp.isAfter(start) && intake.timestamp.isBefore(end),
+          known.contains(intake.medicineId) &&
+          // Not isAfter: a dose logged exactly at midnight belongs to the day
+          // that is starting, and isAfter dropped it from both periods.
+          !intake.timestamp.isBefore(start) &&
+          intake.timestamp.isBefore(end),
     );
     final taken = inPeriod.where((intake) => !intake.skipped).length;
     final skipped = inPeriod.where((intake) => intake.skipped).length;

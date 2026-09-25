@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/medicine.dart';
 import '../models/time_of_day_x.dart';
+import '../services/timeline_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../utils/format.dart';
 import '../widgets/common.dart';
 import '../widgets/shell_nav.dart';
 import 'medicine_editor_screen.dart';
@@ -16,7 +18,7 @@ class MedicinesScreen extends StatelessWidget {
     final state = AppScope.of(context);
     final medicines = state.medicines;
     final use24h = state.settings.use24hClock;
-    final todayDoses = _dosesToday(medicines);
+    final todayDoses = _dosesToday(state);
 
     return Scaffold(
       appBar: AppBar(
@@ -78,20 +80,25 @@ class MedicinesScreen extends StatelessWidget {
     );
   }
 
-  static List<_Dose> _dosesToday(List<Medicine> medicines) {
-    final weekday = DateTime.now().weekday;
-    final doses = <_Dose>[];
-    for (final medicine in medicines) {
-      if (!medicine.enabled) continue;
-      if (!medicine.weekdays.contains(weekday)) continue;
-      // effectiveTimes, not sortedTimes: this list has to agree with what the
-      // scheduler actually queues, which derives interval times from the rule.
-      for (final time in medicine.effectiveTimes) {
-        doses.add(_Dose(medicine: medicine, time: time));
-      }
-    }
-    doses.sort((a, b) => a.time.minutesOfDay.compareTo(b.time.minutesOfDay));
-    return doses;
+  /// Today's scheduled doses, already paired with whatever has been logged
+  /// against them.
+  ///
+  /// Read from [TimelineService] rather than walked out of the medicine list
+  /// here, so this screen and the dashboard cannot disagree about which dose is
+  /// still outstanding — the matching rules exist in exactly one place. No water
+  /// entries are passed because this screen has no use for the drink rows.
+  static List<DoseEvent> _dosesToday(AppState state) {
+    final timeline = TimelineService(
+      entries: const [],
+      intakes: state.medicineLog,
+      medicines: state.medicines,
+      goalMl: state.settings.dailyGoalMl,
+    ).forDay(DateTime.now());
+
+    return [
+      for (final event in timeline.events)
+        if (event is DoseEvent && event.isScheduled) event,
+    ];
   }
 
   static void _openEditor(BuildContext context, [Medicine? medicine]) {
@@ -103,23 +110,21 @@ class MedicinesScreen extends StatelessWidget {
   }
 }
 
-class _Dose {
-  _Dose({required this.medicine, required this.time});
-
-  final Medicine medicine;
-  final TimeOfDay time;
-}
-
+/// The day's doses, one row per scheduled time.
+///
+/// Each row answers for its own slot and nothing else. It used to ask "has this
+/// medicine been taken today", which turned every remaining row green the moment
+/// one of them was tapped — a medicine due four times a day could only ever be
+/// marked once.
 class _TodayDoses extends StatelessWidget {
   const _TodayDoses({required this.doses, required this.use24h});
 
-  final List<_Dose> doses;
+  final List<DoseEvent> doses;
   final bool use24h;
 
   @override
   Widget build(BuildContext context) {
-    final state = AppScope.read(context);
-    final now = TimeOfDay.now().minutesOfDay;
+    final palette = AppColors.of(context);
 
     return Panel(
       padding: EdgeInsets.zero,
@@ -127,49 +132,122 @@ class _TodayDoses extends StatelessWidget {
         children: [
           for (var i = 0; i < doses.length; i++) ...[
             if (i > 0) const Divider(height: 1),
-            ListTile(
-              leading: SizedBox(
-                width: 62,
-                child: Text(
-                  formatTime(doses[i].time, use24h: use24h),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: doses[i].time.minutesOfDay < now
-                        ? AppColors.of(context).inkSoft
-                        : AppColors.of(context).ink,
-                  ),
-                ),
-              ),
-              title: Text(
-                doses[i].medicine.name,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              subtitle: doses[i].medicine.dosage.trim().isEmpty
-                  ? null
-                  : Text(
-                      doses[i].medicine.dosage,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-              trailing: state.takenToday(doses[i].medicine.id)
-                  ? Icon(Icons.check_circle, color: AppColors.of(context).kelp)
-                  : TextButton(
-                      onPressed: () async {
-                        await state.recordMedicineTaken(doses[i].medicine.id);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${doses[i].medicine.name} marked as taken',
-                            ),
-                          ),
-                        );
-                      },
-                      child: const Text('Mark taken'),
-                    ),
-            ),
+            _DoseRow(dose: doses[i], use24h: use24h, palette: palette),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _DoseRow extends StatelessWidget {
+  const _DoseRow({
+    required this.dose,
+    required this.use24h,
+    required this.palette,
+  });
+
+  final DoseEvent dose;
+  final bool use24h;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.read(context);
+    final settled =
+        dose.status == DoseStatus.taken || dose.status == DoseStatus.skipped;
+
+    return ListTile(
+      leading: SizedBox(
+        width: 62,
+        child: Text(
+          formatClock(dose.at, use24h: use24h),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: dose.status == DoseStatus.upcoming
+                ? palette.ink
+                : palette.inkSoft,
+          ),
+        ),
+      ),
+      title: Text(
+        dose.medicine.name,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      subtitle: Text(_note(), style: Theme.of(context).textTheme.bodySmall),
+      trailing: settled
+          ? Icon(
+              dose.status == DoseStatus.taken
+                  ? Icons.check_circle
+                  : Icons.remove_circle_outline,
+              color: dose.status == DoseStatus.taken
+                  ? palette.kelp
+                  : palette.inkSoft,
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () => _record(context, state, skipped: true),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: palette.inkSoft,
+                  ),
+                  child: const Text('Skip'),
+                ),
+                TextButton(
+                  onPressed: () => _record(context, state, skipped: false),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: palette.aquaDeep,
+                  ),
+                  child: const Text('Taken'),
+                ),
+              ],
+            ),
+    );
+  }
+
+  /// The dosage when there is one, otherwise how the slot stands — a row with no
+  /// dosage and no note reads as though something failed to load.
+  String _note() {
+    final dosage = dose.medicine.dosage.trim();
+    final status = switch (dose.status) {
+      DoseStatus.taken => 'Taken',
+      DoseStatus.skipped => 'Skipped',
+      DoseStatus.missed => 'Not logged',
+      DoseStatus.upcoming => 'Due',
+      // Unreachable: this list only carries scheduled slots.
+      DoseStatus.extra => 'Extra dose',
+    };
+    return dosage.isEmpty ? status : '$dosage · $status';
+  }
+
+  Future<void> _record(
+    BuildContext context,
+    AppState state, {
+    required bool skipped,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    // The slot, not the clock: this is what keeps the answer on the row that
+    // was tapped even when the tap comes hours after the dose was due.
+    await state.recordMedicineTaken(
+      dose.medicine.id,
+      scheduledFor: dose.at,
+      skipped: skipped,
+    );
+    if (!context.mounted) return;
+    final clock = formatClock(dose.at, use24h: use24h);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          skipped
+              ? '${dose.medicine.name} at $clock marked as skipped'
+              : '${dose.medicine.name} at $clock marked as taken',
+        ),
       ),
     );
   }

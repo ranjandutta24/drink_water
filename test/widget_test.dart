@@ -651,6 +651,155 @@ void main() {
       expect(doses.map((dose) => dose.driftMinutes).toList(), [10, 30]);
     });
 
+    test('marking one slot leaves the day\'s other slots due', () {
+      // The bug this rule exists for: one tap used to settle every slot the
+      // medicine had that day, so the later doses could never be marked.
+      final thrice = Medicine(
+        id: 'm4',
+        name: 'Antibiotic',
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        times: const [
+          TimeOfDay(hour: 8, minute: 0),
+          TimeOfDay(hour: 14, minute: 0),
+          TimeOfDay(hour: 20, minute: 0),
+        ],
+      );
+
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(
+            medicineId: 'm4',
+            timestamp: at(14, 6),
+            scheduledFor: at(14),
+          ),
+        ],
+        medicines: [thrice],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final doses = timeline.events.cast<DoseEvent>();
+      expect(doses.map((dose) => dose.status).toList(), [
+        DoseStatus.missed,
+        DoseStatus.taken,
+        DoseStatus.missed,
+      ]);
+      expect(timeline.dosesTaken, 1);
+    });
+
+    test('a named slot is claimed however late the tap comes', () {
+      // Deliberately outside the three-hour grace window: an explicit tap on a
+      // row says which dose it answers, so the window does not get a vote.
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(
+            medicineId: 'm1',
+            timestamp: at(21),
+            scheduledFor: at(8),
+          ),
+        ],
+        medicines: [pill],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final dose = timeline.events.single as DoseEvent;
+      expect(dose.status, DoseStatus.taken);
+      expect(dose.at, at(8));
+      // The real time survives, so a report can still say it was 13 h late.
+      expect(dose.driftMinutes, 13 * 60);
+    });
+
+    test('a late-night dose answered after midnight stays on its own day', () {
+      final nightly = Medicine(
+        id: 'm5',
+        name: 'Melatonin',
+        weekdays: const {1, 2, 3, 4, 5, 6, 7},
+        times: const [TimeOfDay(hour: 23, minute: 30)],
+      );
+
+      // Logged at 00:10 the next morning, against the 23:30 slot.
+      final intake = MedicineIntake(
+        medicineId: 'm5',
+        timestamp: DateTime(2026, 3, 6, 0, 10),
+        scheduledFor: DateTime(2026, 3, 5, 23, 30),
+      );
+
+      final tonight = TimelineService(
+        entries: const [],
+        intakes: [intake],
+        medicines: [nightly],
+        goalMl: 2000,
+      ).forDay(day, now: DateTime(2026, 3, 6, 9));
+      expect((tonight.events.single as DoseEvent).status, DoseStatus.taken);
+
+      // And it does not also settle the next night's slot.
+      final tomorrow = TimelineService(
+        entries: const [],
+        intakes: [intake],
+        medicines: [nightly],
+        goalMl: 2000,
+      ).forDay(DateTime(2026, 3, 6), now: DateTime(2026, 3, 6, 9));
+      expect(
+        (tomorrow.events.single as DoseEvent).status,
+        DoseStatus.upcoming,
+      );
+    });
+
+    test('a second answer for one slot does not claim it twice', () {
+      final timeline = TimelineService(
+        entries: const [],
+        intakes: [
+          MedicineIntake(
+            medicineId: 'm1',
+            timestamp: at(8, 2),
+            scheduledFor: at(8),
+          ),
+          MedicineIntake(
+            medicineId: 'm1',
+            timestamp: at(8, 5),
+            scheduledFor: at(8),
+          ),
+        ],
+        medicines: [pill],
+        goalMl: 2000,
+      ).forDay(day, now: at(23));
+
+      final statuses = timeline.events
+          .cast<DoseEvent>()
+          .map((dose) => dose.status)
+          .toList();
+      expect(statuses, [DoseStatus.taken, DoseStatus.extra]);
+      expect(timeline.dosesScheduled, 1);
+      expect(timeline.dosesTaken, 1);
+    });
+
+    test('a slot survives the trip through json', () {
+      final intake = MedicineIntake(
+        medicineId: 'm1',
+        timestamp: at(9, 40),
+        scheduledFor: at(8),
+        skipped: true,
+      );
+      final back = MedicineIntake.tryFromJson(intake.toJson())!;
+      expect(back.scheduledFor, at(8));
+      expect(back.skipped, isTrue);
+      expect(back.claims(at(8)), isTrue);
+      expect(back.claims(at(9, 40)), isFalse);
+    });
+
+    test('an intake with an unreadable slot degrades to no slot', () {
+      final back = MedicineIntake.tryFromJson({
+        'medicineId': 'm1',
+        'timestamp': at(9, 40).toIso8601String(),
+        'scheduledFor': 'not a time',
+      });
+      // The dose is still history worth keeping; only the slot is lost.
+      expect(back, isNotNull);
+      expect(back!.scheduledFor, isNull);
+      expect(back.planDayKey, back.dayKey);
+    });
+
     test('a disabled medicine schedules nothing but still shows a log', () {
       final off = Medicine(
         id: 'm3',

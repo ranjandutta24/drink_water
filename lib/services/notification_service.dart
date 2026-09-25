@@ -46,6 +46,73 @@ void notificationBackgroundHandler(NotificationResponse response) {
   _recordFromAction(response);
 }
 
+/// Which dose a medicine notification stands for.
+@immutable
+class MedicineDosePayload {
+  const MedicineDosePayload({
+    required this.medicineId,
+    required this.scheduledFor,
+  });
+
+  final String medicineId;
+
+  /// Null for a notification queued by an older build, whose payload carried
+  /// only the medicine id.
+  final DateTime? scheduledFor;
+}
+
+/// Packs the slot in front of the id, separated by a bar.
+///
+/// That order is deliberate: the time is a fixed five characters, so the split
+/// is unambiguous even if a medicine id ever contains a bar itself.
+String encodeMedicinePayload(String medicineId, int hour, int minute) {
+  final hh = hour.toString().padLeft(2, '0');
+  final mm = minute.toString().padLeft(2, '0');
+  return '$hh:$mm|$medicineId';
+}
+
+/// Reverses [encodeMedicinePayload], tolerating a bare id from a notification
+/// that was scheduled before the slot was part of the payload. Those alarms sit
+/// in AlarmManager across an app update and cannot be rewritten in place.
+MedicineDosePayload? decodeMedicinePayload(String? payload, {DateTime? now}) {
+  if (payload == null || payload.isEmpty) return null;
+
+  final bar = payload.indexOf('|');
+  if (bar != 5) {
+    return MedicineDosePayload(medicineId: payload, scheduledFor: null);
+  }
+  final hour = int.tryParse(payload.substring(0, 2));
+  final minute = int.tryParse(payload.substring(3, 5));
+  final medicineId = payload.substring(6);
+  if (hour == null || minute == null || medicineId.isEmpty) {
+    return MedicineDosePayload(medicineId: payload, scheduledFor: null);
+  }
+
+  return MedicineDosePayload(
+    medicineId: medicineId,
+    scheduledFor: _resolveSlotDay(hour, minute, now ?? DateTime.now()),
+  );
+}
+
+/// Turns the slot's time of day into a real date.
+///
+/// A notification is answered after it fires, so the slot is normally earlier
+/// the same day. The exception is the late-night dose answered after midnight:
+/// today's copy of 23:30 is still most of a day away, and the dose actually
+/// being answered is yesterday's. Two hours of slack keeps a tap on a
+/// notification the user let sit on the lock screen for a while on the right day.
+///
+/// Built by calendar arithmetic rather than by subtracting a Duration, because
+/// taking 24 hours off a wall-clock time lands an hour out across a daylight
+/// saving change.
+DateTime _resolveSlotDay(int hour, int minute, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day, hour, minute);
+  if (today.difference(now) > const Duration(hours: 2)) {
+    return DateTime(now.year, now.month, now.day - 1, hour, minute);
+  }
+  return today;
+}
+
 Future<void> _recordFromAction(NotificationResponse response) async {
   final actionId = response.actionId;
   if (actionId == null) return;
@@ -76,14 +143,18 @@ Future<void> _recordFromAction(NotificationResponse response) async {
       );
       await prefs.setString('water_log_v1', jsonEncode(entries));
     } else if (actionId == kActionTaken || actionId == kActionSkip) {
-      final medicineId = '${response.payload}';
+      final dose = decodeMedicinePayload(response.payload);
+      if (dose == null) return;
       final raw = prefs.getString('medicine_log_v1') ?? '[]';
       final decoded = jsonDecode(raw);
       final entries = decoded is List ? [...decoded] : <dynamic>[];
       entries.add(
         MedicineIntake(
-          medicineId: medicineId,
+          medicineId: dose.medicineId,
           timestamp: DateTime.now(),
+          // The slot the reminder was queued for, so answering it settles that
+          // dose and not whichever one happens to be nearest the clock.
+          scheduledFor: dose.scheduledFor,
           skipped: actionId == kActionSkip,
         ).toJson(),
       );
@@ -359,7 +430,11 @@ class NotificationService {
             androidScheduleMode: exact
                 ? AndroidScheduleMode.exactAllowWhileIdle
                 : AndroidScheduleMode.inexactAllowWhileIdle,
-            payload: medicine.id,
+            // Carries the slot as well as the medicine: the action buttons are
+            // answered from a background isolate that has no idea which of the
+            // day's doses this notification was for, and guessing from the clock
+            // settled the wrong one on a closely spaced schedule.
+            payload: encodeMedicinePayload(medicine.id, slot.hour, slot.minute),
             // Repeats weekly on the same weekday at the same time.
             matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
           );

@@ -118,6 +118,13 @@ class StorageService {
         jsonEncode(intakes.map((intake) => intake.toJson()).toList()),
       );
 
+  /// Removes the key outright rather than storing an empty list, so a cleared
+  /// log is indistinguishable from a fresh install and the loaders take their
+  /// existing "nothing stored" path.
+  Future<void> clearWaterLog() => _prefs.remove(_kWaterLog);
+
+  Future<void> clearMedicineLog() => _prefs.remove(_kMedicineLog);
+
   Future<void> clearAll() async {
     await _prefs.remove(_kWaterSettings);
     await _prefs.remove(_kMedicines);

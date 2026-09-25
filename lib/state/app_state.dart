@@ -171,10 +171,20 @@ class AppState extends ChangeNotifier {
     await applySchedule();
   }
 
+  /// Removes the medicine and every dose ever logged against it.
+  ///
+  /// The history has to go with it. An intake only carries a medicine id, so
+  /// orphaned rows are unreadable — the timeline hid them while the reports
+  /// counted them, which is how the same week could show two different dose
+  /// totals depending on which screen you were looking at.
   Future<void> deleteMedicine(String id) async {
     _medicines = _medicines.where((item) => item.id != id).toList();
+    _medicineLog = _medicineLog
+        .where((intake) => intake.medicineId != id)
+        .toList();
     notifyListeners();
     await _storage.saveMedicines(_medicines);
+    await _storage.saveMedicineLog(_medicineLog);
     await applySchedule();
   }
 
@@ -189,14 +199,23 @@ class AppState extends ChangeNotifier {
     await applySchedule();
   }
 
+  /// Logs one dose.
+  ///
+  /// [scheduledFor] is the slot the user was answering — the time on the row
+  /// they tapped, or the time the notification was queued for. Pass it whenever
+  /// it is known, because without it the dose can only be matched to a slot by
+  /// guessing from the clock, and a medicine taken several times a day cannot
+  /// tell its doses apart.
   Future<void> recordMedicineTaken(
     String medicineId, {
+    DateTime? scheduledFor,
     bool skipped = false,
   }) async {
     _medicineLog = [
       MedicineIntake(
         medicineId: medicineId,
         timestamp: DateTime.now(),
+        scheduledFor: scheduledFor,
         skipped: skipped,
       ),
       ..._medicineLog,
@@ -205,16 +224,10 @@ class AppState extends ChangeNotifier {
     await _storage.saveMedicineLog(_medicineLog);
   }
 
-  /// True when this medicine has already been logged today.
-  bool takenToday(String medicineId) {
-    final today = WaterEntry.dayKeyFor(DateTime.now());
-    return _medicineLog.any(
-      (intake) =>
-          intake.medicineId == medicineId &&
-          !intake.skipped &&
-          intake.dayKey == today,
-    );
-  }
+  /// How many doses are on record for one medicine — what the delete
+  /// confirmation counts, since deleting a medicine takes its history with it.
+  int loggedDoseCount(String medicineId) =>
+      _medicineLog.where((intake) => intake.medicineId == medicineId).length;
 
   // --- Scheduling -----------------------------------------------------------
 
@@ -259,12 +272,13 @@ class AppState extends ChangeNotifier {
       }
       _waterLog = _pruneOldEntries(mergedLog);
 
-      final seenIntakes = _medicineLog
-          .map((intake) => '${intake.medicineId}@${intake.timestamp}')
-          .toSet();
+      // The slot is part of the identity: re-importing a backup taken before
+      // slots were recorded must not swallow the slotted copy of the same dose,
+      // or the merge would quietly downgrade it back to guesswork.
       final mergedIntakes = [..._medicineLog];
+      final seenIntakes = _medicineLog.map(_intakeKey).toSet();
       for (final intake in bundle.medicineLog) {
-        if (seenIntakes.add('${intake.medicineId}@${intake.timestamp}')) {
+        if (seenIntakes.add(_intakeKey(intake))) {
           mergedIntakes.add(intake);
         }
       }
@@ -289,6 +303,34 @@ class AppState extends ChangeNotifier {
     await _storage.saveWaterLog(_waterLog);
     await _storage.saveMedicineLog(_medicineLog);
     await applySchedule();
+  }
+
+  static String _intakeKey(MedicineIntake intake) =>
+      '${intake.medicineId}@${intake.timestamp}@${intake.scheduledFor}';
+
+  // --- Erasing --------------------------------------------------------------
+
+  /// Throws away the drink history and keeps everything else — the goal, the
+  /// reminder interval, the units, and every medicine and its doses.
+  ///
+  /// No [applySchedule] here or in the two below: reminders are derived from the
+  /// settings and the medicines, never from what has been logged, so clearing
+  /// history cannot change what is queued.
+  /// Not short-circuited when the in-memory list is already empty: a payload
+  /// that failed to decode loads as "no entries" while still sitting on disk,
+  /// and the user asking for it to be gone should see it gone.
+  Future<void> clearWaterLog() async {
+    _waterLog = const [];
+    notifyListeners();
+    await _storage.clearWaterLog();
+  }
+
+  /// Throws away the dose history and keeps the medicines themselves, so
+  /// tomorrow's reminders still arrive.
+  Future<void> clearMedicineLog() async {
+    _medicineLog = const [];
+    notifyListeners();
+    await _storage.clearMedicineLog();
   }
 
   Future<void> resetEverything() async {

@@ -161,25 +161,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Erase everything',
-                  style: Theme.of(context).textTheme.titleMedium,
+                // Ordered narrowest first. Clearing one log is the thing people
+                // actually want — a week of test entries, a phone lent to someone
+                // — and putting the whole-device wipe at the top invites it to be
+                // used for that.
+                _DangerAction(
+                  title: 'Clear drink history',
+                  detail:
+                      'Deletes every logged drink. Your goal, reminder interval, '
+                      'units, medicines and dose history all stay.',
+                  label: 'Clear drinks',
+                  onPressed: _busy ? null : _confirmClearWaterLog,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Removes all settings, medicines and history from this device '
-                  'and cancels every scheduled reminder. Export first if you '
-                  'might want it back.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                const Divider(height: 28),
+                _DangerAction(
+                  title: 'Clear dose history',
+                  detail:
+                      'Deletes every logged dose. The medicines themselves stay, '
+                      'so tomorrow\'s reminders still arrive.',
+                  label: 'Clear doses',
+                  onPressed: _busy ? null : _confirmClearMedicineLog,
                 ),
-                const SizedBox(height: 14),
-                OutlinedButton(
+                const Divider(height: 28),
+                _DangerAction(
+                  title: 'Erase everything',
+                  detail:
+                      'Removes all settings, medicines and history from this '
+                      'device and cancels every scheduled reminder. Export first '
+                      'if you might want it back.',
+                  label: 'Erase everything',
                   onPressed: _busy ? null : _confirmReset,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.of(context).clay,
-                    side: BorderSide(color: AppColors.of(context).clay),
-                  ),
-                  child: const Text('Erase everything'),
                 ),
               ],
             ),
@@ -391,17 +402,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // --- Reset ----------------------------------------------------------------
+  // --- Erasing --------------------------------------------------------------
 
-  Future<void> _confirmReset() async {
+  /// One dialog for all three, because the only thing that differs is what
+  /// survives — and that sentence is the entire point of the dialog.
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String action,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Erase everything?'),
-        content: const Text(
-          'All settings, medicines and history will be deleted from this '
-          'device. This cannot be undone.',
-        ),
+        title: Text(title),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -412,13 +426,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
               backgroundColor: AppColors.of(context).clay,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Erase'),
+            child: Text(action),
           ),
         ],
       ),
     );
+    return confirmed == true && mounted;
+  }
 
-    if (confirmed != true || !mounted) return;
+  Future<void> _confirmClearWaterLog() async {
+    final count = AppScope.read(context).waterLog.length;
+    final ok = await _confirm(
+      title: 'Clear drink history?',
+      message: count == 0
+          ? 'There are no logged drinks to delete.'
+          : '$count logged ${count == 1 ? 'drink' : 'drinks'} will be deleted '
+                'from this device. Your goal, units, reminders, medicines and '
+                'dose history are not touched. This cannot be undone.',
+      action: 'Clear drinks',
+    );
+    if (!ok) return;
+    await AppScope.read(context).clearWaterLog();
+    _snack('Drink history cleared');
+  }
+
+  Future<void> _confirmClearMedicineLog() async {
+    final count = AppScope.read(context).medicineLog.length;
+    final ok = await _confirm(
+      title: 'Clear dose history?',
+      message: count == 0
+          ? 'There are no logged doses to delete.'
+          : '$count logged ${count == 1 ? 'dose' : 'doses'} will be deleted from '
+                'this device. Your medicines and their reminders are not '
+                'touched. This cannot be undone.',
+      action: 'Clear doses',
+    );
+    if (!ok) return;
+    await AppScope.read(context).clearMedicineLog();
+    _snack('Dose history cleared');
+  }
+
+  Future<void> _confirmReset() async {
+    final ok = await _confirm(
+      title: 'Erase everything?',
+      message: 'All settings, medicines and history will be deleted from this '
+          'device, and every scheduled reminder cancelled. This cannot be '
+          'undone.',
+      action: 'Erase',
+    );
+    if (!ok) return;
     await AppScope.read(context).resetEverything();
     _snack('Everything erased');
   }
@@ -427,6 +483,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// One destructive option: what it is called, exactly what it removes, and a
+/// button.
+///
+/// The detail line is not decoration. Three similar-looking erase buttons in one
+/// panel are only safe to use if each one says in advance what it leaves behind.
+class _DangerAction extends StatelessWidget {
+  const _DangerAction({
+    required this.title,
+    required this.detail,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String title;
+  final String detail;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final clay = AppColors.of(context).clay;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(detail, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: clay,
+            side: BorderSide(color: clay),
+          ),
+          child: Text(label),
+        ),
+      ],
+    );
   }
 }
 

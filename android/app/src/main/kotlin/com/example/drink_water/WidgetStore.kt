@@ -158,23 +158,35 @@ internal object WidgetStore {
     /**
      * An intake read off today's log, before it has been matched to a slot.
      *
-     * Held to the second, not the minute, because the gap test has to truncate the
-     * same way Dart's `Duration.inMinutes` does. An intake 180 min 30 s before a
-     * slot is inside the app's window and would be outside a minute-rounded one,
-     * and then the widget's count would disagree with the day view.
+     * [secondOfDay] is held to the second, not the minute, because the gap test
+     * has to truncate the same way Dart's `Duration.inMinutes` does. An intake
+     * 180 min 30 s before a slot is inside the app's window and would be outside
+     * a minute-rounded one, and then the widget's count would disagree with the
+     * day view.
+     *
+     * [slotMinute] is the minute of day the user actually answered, read from
+     * `scheduledFor`, and null for an intake that named no slot — an off-plan
+     * dose, or a record from a build before the field existed.
      */
-    private class Mark(val secondOfDay: Int, val skipped: Boolean)
+    private class Mark(
+        val secondOfDay: Int,
+        val slotMinute: Int?,
+        val skipped: Boolean,
+    )
 
     /**
      * Today's scheduled doses in clock order, each matched to the intake that
      * settles it, if any.
      *
-     * Matching mirrors the app's `TimelineService`: every intake claims the
-     * nearest slot still free, and each slot can be claimed only once. The
-     * simpler "is any intake within three hours" test looks equivalent and is
-     * not — on an hourly schedule a single tap sits within three hours of seven
-     * slots, so one dose would silently settle a whole afternoon and the count
-     * in the corner would jump by seven.
+     * Matching mirrors the app's `TimelineService`, in the same two passes: an
+     * intake that recorded the slot it was answering owns that slot outright,
+     * and only the ones that did not fall back to claiming the nearest slot
+     * still free. Each slot can be claimed once.
+     *
+     * Neither pass can be dropped. The fallback alone is wrong because on an
+     * hourly schedule a single tap sits within three hours of seven slots, so
+     * one dose would silently settle a whole afternoon; and the exact pass alone
+     * would ignore every dose logged before slots were recorded.
      */
     fun dosesToday(context: Context): List<Dose> {
         val store = prefs(context)
@@ -187,12 +199,17 @@ internal object WidgetStore {
         for (i in 0 until log.length()) {
             val intake = log.optJSONObject(i) ?: continue
             val stamp = intake.optString("timestamp")
-            if (dayKeyOfIso(stamp) != today) continue
+            val slotIso = intake.optString("scheduledFor").ifEmpty { null }
+            // Mirrors Dart's `planDayKey`: a dose belongs to the day of the slot
+            // it answered, which is not always the day it was logged — the 23:30
+            // tablet taken at 00:10 is still last night's dose.
+            if (dayKeyOfIso(slotIso ?: stamp) != today) continue
             val id = intake.optString("medicineId")
             if (id.isEmpty()) continue
             val second = secondOfDayOfIso(stamp) ?: continue
+            val slotMinute = slotIso?.let { secondOfDayOfIso(it) }?.div(60)
             logged.getOrPut(id) { mutableListOf() }
-                .add(Mark(second, intake.optBoolean("skipped", false)))
+                .add(Mark(second, slotMinute, intake.optBoolean("skipped", false)))
         }
 
         val doses = mutableListOf<Dose>()
@@ -233,7 +250,29 @@ internal object WidgetStore {
             // slot even when two slots are within reach of both intakes.
             val marks = (logged[id] ?: mutableListOf()).sortedBy { it.secondOfDay }
             val claim = arrayOfNulls<Mark>(slots.size)
+
+            // Pass one: everything that named its slot. Ordered before the
+            // guessing pass so a named slot cannot be taken from under it by a
+            // slot-less dose that merely happened to land nearby.
+            val unattached = mutableListOf<Mark>()
             for (mark in marks) {
+                val named = mark.slotMinute
+                // First *free* slot at that time, not simply the first one, so a
+                // schedule that lists the same time twice behaves the way the
+                // app's exact pass does.
+                var exact = -1
+                if (named != null) {
+                    for (s in slots.indices) {
+                        if (claim[s] == null && slots[s] == named) {
+                            exact = s
+                            break
+                        }
+                    }
+                }
+                if (exact >= 0) claim[exact] = mark else unattached.add(mark)
+            }
+
+            for (mark in unattached) {
                 var best = -1
                 var bestGap = Int.MAX_VALUE
                 for (s in slots.indices) {
@@ -278,7 +317,18 @@ internal object WidgetStore {
      */
     fun nextDose(doses: List<Dose>): Dose? = doses.firstOrNull { !it.settled }
 
-    fun recordTaken(context: Context, medicineId: String): Boolean {
+    /**
+     * Logs one dose as taken.
+     *
+     * [slotMinute] is the minute of day of the dose being answered — always
+     * today's, because the widget only ever offers today's plan. Recording it is
+     * what lets a late tap settle the dose it was for: matching by clock alone
+     * left the dose missed and invented an extra one beside it.
+     *
+     * A negative value means "no slot", which is the shape the app writes for an
+     * off-plan dose.
+     */
+    fun recordTaken(context: Context, medicineId: String, slotMinute: Int): Boolean {
         if (medicineId.isEmpty()) return false
         val store = prefs(context)
         val log = readArray(store.getString(KEY_MEDICINE_LOG, null))
@@ -287,6 +337,11 @@ internal object WidgetStore {
             .put("medicineId", medicineId)
             .put("timestamp", isoLocal(Calendar.getInstance()))
             .put("skipped", false)
+        if (slotMinute >= 0) {
+            // Omitted rather than written as null when there is no slot, matching
+            // `MedicineIntake.toJson`, which leaves the key out entirely.
+            intake.put("scheduledFor", isoLocal(todayAt(slotMinute)))
+        }
 
         val merged = JSONArray().put(intake)
         for (i in 0 until log.length()) {
@@ -302,11 +357,10 @@ internal object WidgetStore {
     // --- helpers -------------------------------------------------------------
 
     /**
-     * Same three hours the app's timeline allows between a slot and its intake.
-     * Not private: the medicine widget needs it to decide whether a tap on "Taken"
-     * would actually settle the dose on screen.
+     * Same three hours the app's timeline allows between a slot and an intake that
+     * never said which slot it was for. Only the fallback pass consults it.
      */
-    const val GRACE_MINUTES = 180
+    private const val GRACE_MINUTES = 180
 
     private fun readArray(raw: String?): JSONArray =
         if (raw.isNullOrEmpty()) JSONArray() else try {
@@ -474,6 +528,20 @@ internal object WidgetStore {
             Calendar.SATURDAY -> 6
             else -> 7
         }
+
+    /**
+     * Today at a given minute of day, with seconds and milliseconds cleared so
+     * the value matches a slot exactly. Dart builds its slots from a `TimeOfDay`,
+     * which carries no seconds, and the comparison is made to the minute.
+     */
+    private fun todayAt(minuteOfDay: Int): Calendar {
+        val at = Calendar.getInstance()
+        at.set(Calendar.HOUR_OF_DAY, minuteOfDay / 60)
+        at.set(Calendar.MINUTE, minuteOfDay % 60)
+        at.set(Calendar.SECOND, 0)
+        at.set(Calendar.MILLISECOND, 0)
+        return at
+    }
 
     /** `"HH:mm"`, as written by the `hhmm` extension on the Dart side. */
     private fun parseHhMm(value: String?): Pair<Int, Int>? {

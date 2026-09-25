@@ -98,10 +98,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           DayTimelineView(
             timeline: timeline,
             settings: settings,
-            // Only today can be ticked off, because an intake is stamped with
-            // the moment it is recorded.
+            // Only today can be answered; a past day is a record, not a form.
             onMarkTaken: _isToday
-                ? (dose) => _markTaken(state, dose)
+                ? (dose) => _recordDose(state, dose, skipped: false)
+                : null,
+            onSkip: _isToday
+                ? (dose) => _recordDose(state, dose, skipped: true)
                 : null,
           ),
         ],
@@ -109,11 +111,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _markTaken(AppState state, DoseEvent dose) async {
-    await state.recordMedicineTaken(dose.medicine.id);
+  Future<void> _recordDose(
+    AppState state,
+    DoseEvent dose, {
+    required bool skipped,
+  }) async {
+    // `dose.at` is the slot this row stands for, which is what makes the answer
+    // land on this dose alone. Without it a medicine due four times a day would
+    // have every remaining row tick itself off along with the one tapped.
+    await state.recordMedicineTaken(
+      dose.medicine.id,
+      scheduledFor: dose.isScheduled ? dose.at : null,
+      skipped: skipped,
+    );
     if (!mounted) return;
+    final clock = formatClock(dose.at, use24h: state.settings.use24hClock);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${dose.medicine.name} marked as taken')),
+      SnackBar(
+        content: Text(
+          skipped
+              ? '${dose.medicine.name} at $clock marked as skipped'
+              : '${dose.medicine.name} at $clock marked as taken',
+        ),
+      ),
     );
   }
 
